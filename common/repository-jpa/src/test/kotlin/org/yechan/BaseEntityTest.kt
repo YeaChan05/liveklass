@@ -47,7 +47,7 @@ class BaseEntityTest {
     }
 
     @Test
-    fun `hibernate proxy 비교는 persistent class를 사용한다`() {
+    fun `하이버네이트 프록시 비교는 영속 클래스를 사용한다`() {
         val entity = TestEntity()
         setId(entity, 1L)
         val initializer = Mockito.mock(LazyInitializer::class.java)

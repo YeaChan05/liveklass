@@ -44,7 +44,7 @@ class MemberRepositoryImplTest {
     }
 
     @Test
-    fun `save persists member and returns generated id`() {
+    fun `회원 저장은 회원을 영속화하고 생성된 아이디를 반환한다`() {
         val saved = memberRepository.save(member())
 
         assertThat(saved.memberId).isNotNull()
@@ -56,7 +56,7 @@ class MemberRepositoryImplTest {
     }
 
     @Test
-    fun `existsByEmail returns true only for persisted email`() {
+    fun `이메일 존재 여부는 저장된 이메일에만 참을 반환한다`() {
         memberRepository.save(member(email = "student@example.com"))
 
         assertThat(memberRepository.existsByEmail("student@example.com")).isTrue()
@@ -64,7 +64,7 @@ class MemberRepositoryImplTest {
     }
 
     @Test
-    fun `findByEmail returns persisted member`() {
+    fun `이메일 조회는 저장된 회원을 반환한다`() {
         val saved = memberRepository.save(member(email = "creator@example.com", role = MemberRole.CREATOR))
 
         val found = memberRepository.findByEmail("creator@example.com")
@@ -73,12 +73,12 @@ class MemberRepositoryImplTest {
     }
 
     @Test
-    fun `findByEmail returns null for unknown email`() {
+    fun `알 수 없는 이메일 조회는 빈 값을 반환한다`() {
         assertThat(memberRepository.findByEmail("unknown@example.com")).isNull()
     }
 
     @Test
-    fun `findById returns persisted member`() {
+    fun `아이디 조회는 저장된 회원을 반환한다`() {
         val saved = memberRepository.save(member(status = MemberStatus.DELETED))
 
         val found = memberRepository.findById(saved.memberId!!)
@@ -87,7 +87,7 @@ class MemberRepositoryImplTest {
     }
 
     @Test
-    fun `findById returns null for unknown id`() {
+    fun `알 수 없는 아이디 조회는 빈 값을 반환한다`() {
         assertThat(memberRepository.findById(-1L)).isNull()
     }
 

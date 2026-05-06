@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 
 class MemberEntityTest {
     @Test
-    fun `from creates entity from member model`() {
+    fun `회원 모델로 엔티티를 생성한다`() {
         val member = MemberModel(
             memberId = 1L,
             email = "student@example.com",
@@ -25,7 +25,7 @@ class MemberEntityTest {
     }
 
     @Test
-    fun `toDomain creates member model from entity`() {
+    fun `엔티티로 회원 모델을 생성한다`() {
         val entity = MemberEntity.from(
             MemberModel(
                 email = "creator@example.com",

@@ -9,7 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 
 class PasswordEncoderBeanRegistrarTest {
     @Test
-    fun `자동 설정은 password encoder 관련 빈을 등록한다`() {
+    fun `자동 설정은 비밀번호 인코더 관련 빈을 등록한다`() {
         val context = AnnotationConfigApplicationContext().apply {
             register(TestConfiguration::class.java)
             refresh()

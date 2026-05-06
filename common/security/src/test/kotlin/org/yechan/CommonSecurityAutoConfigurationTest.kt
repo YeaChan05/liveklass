@@ -58,7 +58,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `requests without token are unauthorized`() {
+    fun `토큰이 없는 요청은 인증 실패로 거부된다`() {
         restTestClient.get()
             .uri("/secure")
             .header("X-API-Version", "v1")
@@ -67,7 +67,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `requests with invalid token are unauthorized`() {
+    fun `잘못된 토큰 요청은 인증 실패로 거부된다`() {
         restTestClient.get()
             .uri("/secure")
             .header("X-API-Version", "v1")
@@ -77,7 +77,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `requests with valid token are allowed`() {
+    fun `올바른 토큰 요청은 허용된다`() {
         val token = tokenGenerator.generate(1L).accessToken
 
         restTestClient.get()
@@ -91,7 +91,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `security filters are only registered in the security chain`() {
+    fun `보안 필터는 보안 체인에만 등록된다`() {
         val filterRegistrations = context.getBeansOfType(FilterRegistrationBean::class.java).values
 
         Assertions.assertThat(filterRegistrations)
@@ -101,7 +101,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `additional customizers are applied before default closing rule`() {
+    fun `추가 보안 정책은 기본 차단 규칙보다 먼저 적용된다`() {
         restTestClient.get()
             .uri("/open")
             .header("X-API-Version", "v1")
@@ -118,7 +118,7 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
-    fun `versioned api endpoints still reject requests without api version header`() {
+    fun `버전 API는 버전 헤더가 없으면 요청을 거부한다`() {
         rawRestTestClient.get()
             .uri("/open")
             .exchange()

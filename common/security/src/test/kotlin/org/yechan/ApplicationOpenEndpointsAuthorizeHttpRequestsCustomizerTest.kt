@@ -7,7 +7,7 @@ import org.springframework.http.HttpMethod
 class ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizerTest {
 
     @Test
-    fun `additional matchers는 method 유무에 맞춰 공개 경로를 추가한다`() {
+    fun `추가 경로 조건은 HTTP 메서드 유무에 맞춰 공개 경로를 추가한다`() {
         val registry = mockApplicationRequestMatcherRegistry()
 
         ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(

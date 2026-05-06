@@ -10,7 +10,7 @@ import org.springframework.core.env.MapPropertySource
 
 class BeanRegistrarExtensionsTest {
     @Test
-    fun `matchIfMissing true면 property가 없어도 bean을 등록한다`() {
+    fun `값이 없을 때 일치 옵션이 켜져 있으면 속성이 없어도 빈을 등록한다`() {
         val context = createContext(TestMatchIfMissingConfiguration::class.java)
 
         assertThat(context.containsBean("sample")).isTrue()
@@ -19,7 +19,7 @@ class BeanRegistrarExtensionsTest {
     }
 
     @Test
-    fun `property 값이 다르면 bean을 등록하지 않는다`() {
+    fun `속성 값이 다르면 빈을 등록하지 않는다`() {
         val context = createContext(
             TestExactMatchConfiguration::class.java,
             "sample.feature.enabled" to "false",
@@ -31,7 +31,7 @@ class BeanRegistrarExtensionsTest {
     }
 
     @Test
-    fun `property 값이 같으면 bean을 등록한다`() {
+    fun `속성 값이 같으면 빈을 등록한다`() {
         val context = createContext(
             TestExactMatchConfiguration::class.java,
             "sample.feature.enabled" to "true",
@@ -43,7 +43,7 @@ class BeanRegistrarExtensionsTest {
     }
 
     @Test
-    fun `registerIf true이면 첫 분기만 등록한다`() {
+    fun `조건 등록이 참이면 첫 분기만 등록한다`() {
         val context = createContext(
             TestConditionalChainConfiguration::class.java,
             "sample.feature.mode" to "alpha",
@@ -57,7 +57,7 @@ class BeanRegistrarExtensionsTest {
     }
 
     @Test
-    fun `registerIf false이면 else if 분기를 등록한다`() {
+    fun `조건 등록이 거짓이면 다음 조건 분기를 등록한다`() {
         val context = createContext(
             TestConditionalChainConfiguration::class.java,
             "sample.feature.mode" to "beta",
@@ -71,7 +71,7 @@ class BeanRegistrarExtensionsTest {
     }
 
     @Test
-    fun `모든 조건이 false이면 else 분기를 등록한다`() {
+    fun `모든 조건이 거짓이면 기본 분기를 등록한다`() {
         val context = createContext(
             TestConditionalChainConfiguration::class.java,
             "sample.feature.mode" to "other",

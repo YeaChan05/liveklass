@@ -39,7 +39,7 @@ class MemberAuthControllerTest @Autowired constructor(
     private val tokenGenerator: TokenGenerator,
 ) {
     @Test
-    fun `signup validates request and returns created member`() {
+    fun `회원가입은 요청을 검증하고 생성된 회원을 반환한다`() {
         restTestClient.post()
             .uri("/api/v1/auth/signup")
             .header("X-API-Version", "v1")
@@ -71,7 +71,7 @@ class MemberAuthControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `login validates request and hides authentication failures`() {
+    fun `로그인은 요청을 검증하고 인증 실패 사유를 숨긴다`() {
         val beforeLoginCalls = memberAuthService.loginCalls
 
         restTestClient.post()
@@ -100,7 +100,7 @@ class MemberAuthControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `login refresh and me expose required responses`() {
+    fun `로그인 리프레시 내 정보 조회는 필요한 응답을 노출한다`() {
         val accessToken = tokenGenerator.generate(1L).accessToken
 
         restTestClient.post()

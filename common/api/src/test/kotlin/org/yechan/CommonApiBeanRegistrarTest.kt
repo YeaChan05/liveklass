@@ -10,7 +10,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 class CommonApiBeanRegistrarTest {
     @Test
-    fun `자동 설정은 공통 api 빈을 등록한다`() {
+    fun `자동 설정은 공통 API 빈을 등록한다`() {
         val context = AnnotationConfigApplicationContext().apply {
             register(TestConfiguration::class.java)
             refresh()

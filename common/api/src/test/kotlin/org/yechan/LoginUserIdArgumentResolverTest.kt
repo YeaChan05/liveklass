@@ -23,14 +23,14 @@ class LoginUserIdArgumentResolverTest {
     }
 
     @Test
-    fun `어노테이션이 붙은 Long 파라미터를 지원한다`() {
+    fun `어노테이션이 붙은 래퍼 숫자 파라미터를 지원한다`() {
         val parameter = MethodParameter(method("handlerWithLong", Long::class.javaObjectType), 0)
 
         assertThat(resolver.supportsParameter(parameter)).isTrue()
     }
 
     @Test
-    fun `어노테이션이 붙은 primitive long 파라미터를 지원한다`() {
+    fun `어노테이션이 붙은 원시 숫자 파라미터를 지원한다`() {
         val parameter =
             MethodParameter(method("handlerWithPrimitive", Long::class.javaPrimitiveType!!), 0)
 
@@ -61,7 +61,7 @@ class LoginUserIdArgumentResolverTest {
     }
 
     @Test
-    fun `인증 정보가 없으면 unauthorized를 던진다`() {
+    fun `인증 정보가 없으면 인증 실패 예외를 던진다`() {
         val parameter = MethodParameter(method("handlerWithLong", Long::class.javaObjectType), 0)
 
         assertThatThrownBy {
@@ -72,7 +72,7 @@ class LoginUserIdArgumentResolverTest {
     }
 
     @Test
-    fun `anonymous 인증은 unauthorized를 던진다`() {
+    fun `익명 인증은 인증 실패 예외를 던진다`() {
         SecurityContextHolder.getContext().authentication =
             AnonymousAuthenticationToken(
                 "key",
@@ -89,7 +89,7 @@ class LoginUserIdArgumentResolverTest {
     }
 
     @Test
-    fun `숫자가 아닌 사용자 아이디는 bad request를 던진다`() {
+    fun `숫자가 아닌 사용자 아이디는 잘못된 요청 예외를 던진다`() {
         SecurityContextHolder.getContext().authentication =
             UsernamePasswordAuthenticationToken(
                 "not-a-number",

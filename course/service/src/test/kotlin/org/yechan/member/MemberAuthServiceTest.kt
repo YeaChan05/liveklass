@@ -26,7 +26,7 @@ class MemberAuthServiceTest {
         MemberAuthService(members, refreshTokens, passwordHashEncoder, tokenGenerator, tokenVerifier, authTokenProperties)
 
     @Test
-    fun `signup stores active member with hashed password`() {
+    fun `회원가입은 해시된 비밀번호로 활성 회원을 저장한다`() {
         val result = service.signup(SignupCommand("student@example.com", "password1234!", " 홍길동 ", MemberRole.STUDENT))
 
         val saved = members.findByEmail("student@example.com")
@@ -39,7 +39,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `signup rejects duplicate email`() {
+    fun `회원가입은 중복 이메일을 거부한다`() {
         service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
 
         assertThatThrownBy {
@@ -50,7 +50,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `login returns tokens and replaces previous refresh token`() {
+    fun `로그인은 토큰을 반환하고 이전 리프레시 토큰을 교체한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
 
         val result = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -66,7 +66,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `login hides whether email or password is wrong`() {
+    fun `로그인은 이메일과 비밀번호 중 무엇이 틀렸는지 숨긴다`() {
         service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
 
         assertThatThrownBy { service.login(LoginCommand("student@example.com", "wrong-password")) }
@@ -79,7 +79,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `login rejects deleted member`() {
+    fun `로그인은 삭제된 회원을 거부한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
         members.updateStatus(member.userId, MemberStatus.DELETED)
 
@@ -89,7 +89,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `refresh access token requires stored matching refresh token`() {
+    fun `액세스 토큰 재발급은 저장된 일치 리프레시 토큰을 요구한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
 
@@ -105,7 +105,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `refresh rejects token when stored token belongs to another user`() {
+    fun `재발급은 저장된 토큰의 사용자가 다르면 거부한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
         refreshTokens.replaceSavedToken(member.userId, userId = 999L)
@@ -116,7 +116,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `refresh rejects expired stored token`() {
+    fun `재발급은 만료된 저장 토큰을 거부한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
         refreshTokens.replaceSavedToken(member.userId, expiresAt = LocalDateTime.now().minusSeconds(1))
@@ -127,7 +127,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `refresh rejects token when member is missing or deleted`() {
+    fun `재발급은 회원이 없거나 삭제된 경우 거부한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
 
@@ -146,7 +146,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `refresh rejects token with unparsable authentication name`() {
+    fun `재발급은 인증 이름을 숫자로 해석할 수 없으면 거부한다`() {
         tokenVerifier.authenticationName = "not-a-number"
 
         assertThatThrownBy { service.refresh(RefreshTokenCommand("refresh-1")) }
@@ -155,7 +155,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `get current user returns active member`() {
+    fun `현재 사용자 조회는 활성 회원을 반환한다`() {
         val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
 
         val result = service.getCurrentUser(member.userId)
@@ -168,7 +168,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    fun `get current user rejects unknown user`() {
+    fun `현재 사용자 조회는 알 수 없는 사용자를 거부한다`() {
         assertThatThrownBy { service.getCurrentUser(404L) }
             .isInstanceOf(BusinessException::class.java)
             .hasMessage("인증이 필요합니다.")
