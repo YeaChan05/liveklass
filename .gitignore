@@ -1,9 +1,18 @@
-HELP.md
 .gradle
-build/
 **/build/
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin
 
-### STS ###
+### IntelliJ IDEA ###
+*.iws
+*.iml
+*.ipr
+.idea/
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Eclipse ###
 .apt_generated
 .classpath
 .factorypath
@@ -12,16 +21,9 @@ build/
 .springBeans
 .sts4-cache
 bin/
-
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-
-
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+!**/src/integrationTest/**/bin/
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
