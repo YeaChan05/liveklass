@@ -48,6 +48,7 @@ configureByTypePrefix("kotlin") {
     apply {
         plugin("java-library")
         plugin("org.jetbrains.kotlin.jvm")
+        plugin("jacoco")
     }
 
     val hasIntegrationTestSources = file("src/integrationTest/kotlin").exists() ||
@@ -112,6 +113,24 @@ configureByTypePrefix("kotlin") {
             val check by getting {
                 dependsOn("integrationTest")
             }
+        }
+
+        tasks.named("integrationTest") {
+            finalizedBy("jacocoIntegrationTestReport")
+        }
+
+        tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
+            dependsOn("integrationTest")
+            executionData(layout.buildDirectory.file("jacoco/integrationTest.exec"))
+            sourceDirectories.from(files("src/main/kotlin"))
+            classDirectories.from(layout.buildDirectory.dir("classes/kotlin/main"))
+        }
+    }
+
+    tasks.withType<JacocoReport>().configureEach {
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
         }
     }
 
@@ -207,5 +226,23 @@ subprojects {
                 archiveBaseName.set(project.path.trimStart(':').replace(':', '-'))
             }
         }
+    }
+}
+
+tasks.register<JacocoReport>("jacocoRootReport") {
+    dependsOn(subprojects.map { it.tasks.withType<Test>() })
+    executionData(
+        subprojects.flatMap {
+            listOf(
+                it.layout.buildDirectory.file("jacoco/test.exec"),
+                it.layout.buildDirectory.file("jacoco/integrationTest.exec"),
+            )
+        },
+    )
+    sourceDirectories.from(subprojects.map { it.file("src/main/kotlin") })
+    classDirectories.from(subprojects.map { it.layout.buildDirectory.dir("classes/kotlin/main") })
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
     }
 }
