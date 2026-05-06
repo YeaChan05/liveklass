@@ -34,5 +34,3 @@ class CommonApiBeanRegistrar :
             }
         }
     })
-
-private const val API_VERSION_HEADER = "X-API-Version"

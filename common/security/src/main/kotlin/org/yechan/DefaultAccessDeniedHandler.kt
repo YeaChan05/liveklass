@@ -11,6 +11,9 @@ class DefaultAccessDeniedHandler : AccessDeniedHandler {
         response: HttpServletResponse,
         accessDeniedException: AccessDeniedException,
     ) {
-        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")
+        response.status = HttpServletResponse.SC_FORBIDDEN
+        response.contentType = "application/json"
+        response.characterEncoding = "UTF-8"
+        response.writer.write("""{"code":"ACCESS_DENIED","message":"접근 권한이 없습니다."}""")
     }
 }

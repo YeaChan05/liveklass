@@ -11,6 +11,9 @@ class DefaultAuthenticationEntryPoint : AuthenticationEntryPoint {
         response: HttpServletResponse,
         authException: AuthenticationException,
     ) {
-        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+        response.status = HttpServletResponse.SC_UNAUTHORIZED
+        response.contentType = "application/json"
+        response.characterEncoding = "UTF-8"
+        response.writer.write("""{"code":"AUTHENTICATION_FAILED","message":"인증이 필요합니다."}""")
     }
 }
