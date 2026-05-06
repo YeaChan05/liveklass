@@ -5,6 +5,7 @@ class RefreshTokenRepositoryImpl(
 ) : RefreshTokenRepository {
     override fun replace(refreshToken: RefreshTokenModel) {
         refreshTokenJpaRepository.deleteByUserId(refreshToken.userId)
+        refreshTokenJpaRepository.flush()
         refreshTokenJpaRepository.save(RefreshTokenEntity.from(refreshToken))
     }
 

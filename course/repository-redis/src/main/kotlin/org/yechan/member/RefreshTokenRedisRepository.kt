@@ -13,42 +13,56 @@ class RefreshTokenRedisRepository(
     override fun replace(refreshToken: RefreshTokenModel) {
         deleteByUserId(refreshToken.userId)
 
-        val tokenKey = RefreshTokenRedisKey.byTokenHash(refreshToken.tokenHash)
-        val userKey = RefreshTokenRedisKey.byUserId(refreshToken.userId)
-        val value = RefreshTokenRedisValue.from(refreshToken)
-        val ttl = Duration.between(LocalDateTime.now(), refreshToken.expiresAt)
-
-        if (ttl.isNegative || ttl.isZero) {
+        val ttl = refreshToken.timeToLive()
+        if (!ttl.canBeStored()) {
             return
         }
 
-        redisTemplate.opsForValue().set(tokenKey.value, value.serialize(), ttl)
-        redisTemplate.opsForValue().set(userKey.value, refreshToken.tokenHash, ttl)
+        valueOperations.set(
+            RefreshTokenRedisKey.byTokenHash(refreshToken.tokenHash).value,
+            RefreshTokenRedisValue.from(refreshToken).serialize(),
+            ttl,
+        )
+        valueOperations.set(
+            RefreshTokenRedisKey.byUserId(refreshToken.userId).value,
+            refreshToken.tokenHash,
+            ttl,
+        )
     }
 
     override fun findByUserId(userId: Long): RefreshTokenModel? {
-        val tokenHash = redisTemplate.opsForValue().get(RefreshTokenRedisKey.byUserId(userId).value)
+        val tokenHash = valueOperations.get(RefreshTokenRedisKey.byUserId(userId).value)
             ?: return null
         return findByTokenHash(tokenHash)
     }
 
     override fun findByTokenHash(tokenHash: String): RefreshTokenModel? {
-        val value = redisTemplate.opsForValue().get(RefreshTokenRedisKey.byTokenHash(tokenHash).value)
+        val value = valueOperations.get(RefreshTokenRedisKey.byTokenHash(tokenHash).value)
             ?: return null
-        return RefreshTokenRedisValue.deserialize(tokenHash, value).toDomain()
+        return RefreshTokenRedisValue.deserialize(value).toDomain(tokenHash)
     }
 
     override fun deleteByUserId(userId: Long) {
+        redisTemplate.delete(keysByUserId(userId))
+    }
+
+    private val valueOperations
+        get() = redisTemplate.opsForValue()
+
+    private fun keysByUserId(userId: Long): List<String> {
         val userKey = RefreshTokenRedisKey.byUserId(userId)
-        val tokenHash = redisTemplate.opsForValue().get(userKey.value)
-        val keys = buildList {
+        val tokenHash = valueOperations.get(userKey.value)
+        return buildList {
             add(userKey.value)
             if (tokenHash != null) {
                 add(RefreshTokenRedisKey.byTokenHash(tokenHash).value)
             }
         }
-        redisTemplate.delete(keys)
     }
+
+    private fun RefreshTokenModel.timeToLive(): Duration = Duration.between(LocalDateTime.now(), expiresAt)
+
+    private fun Duration.canBeStored(): Boolean = !isNegative && !isZero
 }
 
 private sealed interface RefreshTokenRedisKey {
@@ -96,25 +110,12 @@ private data class RefreshTokenRedisValue(
             expiresAt = refreshToken.expiresAt,
         )
 
-        fun deserialize(
-            tokenHash: String,
-            value: String,
-        ): RefreshTokenWithHash {
+        fun deserialize(value: String): RefreshTokenRedisValue {
             val parts = value.split(SEPARATOR, limit = 2)
-            return RefreshTokenWithHash(
-                tokenHash = tokenHash,
-                value = RefreshTokenRedisValue(
-                    userId = parts[0].toLong(),
-                    expiresAt = LocalDateTime.parse(parts[1], DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                ),
+            return RefreshTokenRedisValue(
+                userId = parts[0].toLong(),
+                expiresAt = LocalDateTime.parse(parts[1], DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             )
         }
     }
-}
-
-private data class RefreshTokenWithHash(
-    val tokenHash: String,
-    val value: RefreshTokenRedisValue,
-) {
-    fun toDomain(): RefreshTokenModel = value.toDomain(tokenHash)
 }
