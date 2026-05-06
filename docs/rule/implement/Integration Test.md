@@ -46,3 +46,8 @@ fun `property 값이 다르면 bean을 등록하지 않는다`() {
 ...
 }
 ```
+
+## 코드 작성 방식
+- JUnit 5와 AssertJ를 사용한다
+- 단위 테스트 클래스는 `*Test`로 끝나야 한다
+- AAA(Arrange/Act/Assert) 패턴을 따르며 주석으로 구분한다
