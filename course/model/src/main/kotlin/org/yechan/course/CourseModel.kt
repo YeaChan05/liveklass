@@ -1,33 +1,36 @@
 package org.yechan.course
 
-import java.time.LocalDate
+import java.time.LocalDateTime
 
 interface CourseIdentifier {
     val courseId: Long?
 }
 
 interface CourseProps {
+    val creatorId: Long?
     val title: String
     val description: String
-    val price: Long
+    val price: Money
     val capacity: Int
-    val periodStart: LocalDate
-    val periodEnd: LocalDate
+    val periodStart: LocalDateTime
+    val periodEnd: LocalDateTime
     val status: CourseStatus
 }
 
 data class CourseModel(
     override val courseId: Long? = null,
+    override val creatorId: Long? = null,
     override val title: String,
     override val description: String,
-    override val price: Long,
+    override val price: Money,
     override val capacity: Int,
-    override val periodStart: LocalDate,
-    override val periodEnd: LocalDate,
+    override val periodStart: LocalDateTime,
+    override val periodEnd: LocalDateTime,
     override val status: CourseStatus = CourseStatus.DRAFT,
 ) : CourseProps,
     CourseIdentifier {
     init {
+        if (creatorId == null) throw IllegalArgumentException("강의 생성자는 필수입니다.")
         validateCapacity()
         if (!periodEnd.isAfter(periodStart)) throw IllegalArgumentException("수강 종료일은 시작일보다 빠를 수 없습니다.")
     }
@@ -49,7 +52,7 @@ data class CourseModel(
         validateIsOpen()
         validateCapacity(currentEnrollmentCount)
         return EnrollmentModel(
-            courseId = courseId ?: error("저장된 강의만 신청할 수 있습니다."),
+            courseId = courseId ?: throw IllegalArgumentException("저장된 강의만 신청할 수 있습니다."),
             memberId = memberId,
         )
     }
