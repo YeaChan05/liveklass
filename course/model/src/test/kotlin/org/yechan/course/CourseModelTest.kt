@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.yechan.enrollment.EnrollmentStatus
-import java.time.LocalDate
+import java.time.LocalDateTime
 
 class CourseModelTest {
     @Test
@@ -13,10 +13,10 @@ class CourseModelTest {
 
         assertEquals("Kotlin Basic", course.title)
         assertEquals("Kotlin course", course.description)
-        assertEquals(100_000L, course.price)
+        assertEquals(Money(amount = 100000), course.price)
         assertEquals(2, course.capacity)
-        assertEquals(LocalDate.of(2026, 6, 1), course.periodStart)
-        assertEquals(LocalDate.of(2026, 6, 30), course.periodEnd)
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 0), course.periodStart)
+        assertEquals(LocalDateTime.of(2026, 6, 30, 0, 0), course.periodEnd)
         assertEquals(CourseStatus.DRAFT, course.status)
     }
 
@@ -27,7 +27,7 @@ class CourseModelTest {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
-        assertEquals("모집 중인 강의만 신청할 수 있습니다.", exception.message)
+        assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
     }
 
     @Test
@@ -74,13 +74,16 @@ class CourseModelTest {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
-        assertEquals("모집 중인 강의만 신청할 수 있습니다.", exception.message)
+        assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
     }
 
     @Test
     fun `잘못된 수강 기간은 거부된다`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
-            course(periodStart = LocalDate.of(2026, 6, 30), periodEnd = LocalDate.of(2026, 6, 1))
+            course(
+                periodStart = LocalDateTime.of(2026, 6, 30, 0, 0),
+                periodEnd = LocalDateTime.of(2026, 6, 1, 0, 0),
+            )
         }
         assertEquals("수강 종료일은 시작일보다 빠를 수 없습니다.", exception.message)
     }
@@ -93,13 +96,14 @@ class CourseModelTest {
 
     private fun course(
         capacity: Int = 2,
-        periodStart: LocalDate = LocalDate.of(2026, 6, 1),
-        periodEnd: LocalDate = LocalDate.of(2026, 6, 30),
+        periodStart: LocalDateTime = LocalDateTime.of(2026, 6, 1, 0, 0),
+        periodEnd: LocalDateTime = LocalDateTime.of(2026, 6, 30, 0, 0),
     ) = CourseModel(
         courseId = 10L,
+        creatorId = 1L,
         title = "Kotlin Basic",
         description = "Kotlin course",
-        price = 100_000L,
+        price = Money(100_000L),
         capacity = capacity,
         periodStart = periodStart,
         periodEnd = periodEnd,
