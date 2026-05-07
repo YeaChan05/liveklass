@@ -63,7 +63,7 @@ data class CourseModel(
     }
 
     private fun validateIsOpen() {
-        if (status != CourseStatus.OPEN) throw IllegalArgumentException("모집 중인 강의만 신청할 수 있습니다.")
+        if (status != CourseStatus.OPEN) throw IllegalArgumentException("모집 중인 강의만 마감할 수 있습니다.")
     }
 
     private fun validateCapacity() {
