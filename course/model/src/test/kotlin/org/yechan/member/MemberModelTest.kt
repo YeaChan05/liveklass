@@ -13,7 +13,7 @@ class MemberModelTest {
             email = "test@example.com",
             passwordHash = "hash",
             name = "name",
-            role = MemberRole.STUDENT,
+            role = MemberRole.CLASSMATE,
             status = MemberStatus.ACTIVE,
         )
 
@@ -28,7 +28,7 @@ class MemberModelTest {
             email = "test@example.com",
             passwordHash = "hash",
             name = "name",
-            role = MemberRole.STUDENT,
+            role = MemberRole.CLASSMATE,
             status = MemberStatus.DELETED,
         )
 

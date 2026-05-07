@@ -45,14 +45,14 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 " 홍길동 ",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
 
         val saved = members.findByEmail("student@example.com")
         assertThat(result.email).isEqualTo("student@example.com")
         assertThat(result.name).isEqualTo("홍길동")
-        assertThat(result.role).isEqualTo(MemberRole.STUDENT)
+        assertThat(result.role).isEqualTo(MemberRole.CLASSMATE)
         assertThat(saved?.passwordHash).isEqualTo("hashed:password1234!")
         assertThat(saved?.passwordHash).isNotEqualTo("password1234!")
         assertThat(saved?.status).isEqualTo(MemberStatus.ACTIVE)
@@ -65,7 +65,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
 
@@ -75,7 +75,7 @@ class MemberAuthServiceTest {
                     "student@example.com",
                     "password1234!",
                     "홍길동",
-                    MemberRole.STUDENT,
+                    MemberRole.CLASSMATE,
                 ),
             )
         }
@@ -90,7 +90,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
 
@@ -115,7 +115,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
 
@@ -135,7 +135,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val loginResult = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -158,7 +158,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         members.updateStatus(member.userId, MemberStatus.DELETED)
@@ -175,7 +175,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -198,7 +198,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -216,7 +216,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -237,7 +237,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
@@ -252,7 +252,7 @@ class MemberAuthServiceTest {
                 "deleted@example.com",
                 "password1234!",
                 "이삭제",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
         val deletedLogin = service.login(LoginCommand("deleted@example.com", "password1234!"))
@@ -279,7 +279,7 @@ class MemberAuthServiceTest {
                 "student@example.com",
                 "password1234!",
                 "홍길동",
-                MemberRole.STUDENT,
+                MemberRole.CLASSMATE,
             ),
         )
 
@@ -288,7 +288,7 @@ class MemberAuthServiceTest {
         assertThat(result.id).isEqualTo(member.userId)
         assertThat(result.email).isEqualTo("student@example.com")
         assertThat(result.name).isEqualTo("홍길동")
-        assertThat(result.role).isEqualTo(MemberRole.STUDENT)
+        assertThat(result.role).isEqualTo(MemberRole.CLASSMATE)
         assertThat(result.status).isEqualTo(MemberStatus.ACTIVE)
     }
 

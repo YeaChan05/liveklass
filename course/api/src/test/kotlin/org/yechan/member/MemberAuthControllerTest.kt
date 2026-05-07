@@ -237,7 +237,7 @@ class MemberAuthControllerTest @Autowired constructor(
                 refreshToken = "refresh-1",
                 tokenType = "Bearer",
                 expiresIn = 1800,
-                user = MemberSummary(1, "student@example.com", "홍길동", MemberRole.STUDENT),
+                user = MemberSummary(1, "student@example.com", "홍길동", MemberRole.CLASSMATE),
             )
         }
 
@@ -256,7 +256,7 @@ class MemberAuthControllerTest @Autowired constructor(
             id = userId,
             email = "student@example.com",
             name = "홍길동",
-            role = MemberRole.STUDENT,
+            role = MemberRole.CLASSMATE,
             status = MemberStatus.ACTIVE,
         )
     }

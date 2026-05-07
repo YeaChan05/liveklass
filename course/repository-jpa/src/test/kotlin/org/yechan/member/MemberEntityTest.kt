@@ -11,7 +11,7 @@ class MemberEntityTest {
             email = "student@example.com",
             passwordHash = "hashed-password",
             name = "홍길동",
-            role = MemberRole.STUDENT,
+            role = MemberRole.CLASSMATE,
             status = MemberStatus.ACTIVE,
         )
 
@@ -20,7 +20,7 @@ class MemberEntityTest {
         assertThat(entity.email).isEqualTo("student@example.com")
         assertThat(entity.passwordHash).isEqualTo("hashed-password")
         assertThat(entity.name).isEqualTo("홍길동")
-        assertThat(entity.role).isEqualTo(MemberRole.STUDENT)
+        assertThat(entity.role).isEqualTo(MemberRole.CLASSMATE)
         assertThat(entity.status).isEqualTo(MemberStatus.ACTIVE)
     }
 

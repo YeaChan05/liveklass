@@ -51,7 +51,7 @@ class MemberRepositoryImplTest {
         assertThat(saved.email).isEqualTo("student@example.com")
         assertThat(saved.passwordHash).isEqualTo("hashed-password")
         assertThat(saved.name).isEqualTo("홍길동")
-        assertThat(saved.role).isEqualTo(MemberRole.STUDENT)
+        assertThat(saved.role).isEqualTo(MemberRole.CLASSMATE)
         assertThat(saved.status).isEqualTo(MemberStatus.ACTIVE)
     }
 
@@ -93,7 +93,7 @@ class MemberRepositoryImplTest {
 
     private fun member(
         email: String = "student@example.com",
-        role: MemberRole = MemberRole.STUDENT,
+        role: MemberRole = MemberRole.CLASSMATE,
         status: MemberStatus = MemberStatus.ACTIVE,
     ) = MemberModel(
         email = email,

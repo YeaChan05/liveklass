@@ -30,7 +30,7 @@ data class MemberModel(
 
 enum class MemberRole {
     CREATOR,
-    STUDENT,
+    CLASSMATE,
     ADMIN,
 }
 
