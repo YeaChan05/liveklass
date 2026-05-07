@@ -72,7 +72,7 @@ class MemberAuthControllerTest @Autowired constructor(
                     "email" to "student@example.com",
                     "password" to "password1234!",
                     "name" to "홍길동",
-                    "role" to "STUDENT",
+                    "role" to "CLASSMATE",
                 ),
             )
             .exchange()
@@ -81,7 +81,7 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.userId").isEqualTo(1)
             .jsonPath("$.email").isEqualTo("student@example.com")
             .jsonPath("$.name").isEqualTo("홍길동")
-            .jsonPath("$.role").isEqualTo("STUDENT")
+            .jsonPath("$.role").isEqualTo("CLASSMATE")
     }
 
     @Test
@@ -129,7 +129,7 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.refreshToken").isEqualTo("refresh-1")
             .jsonPath("$.tokenType").isEqualTo("Bearer")
             .jsonPath("$.expiresIn").isEqualTo(1800)
-            .jsonPath("$.user.role").isEqualTo("STUDENT")
+            .jsonPath("$.user.role").isEqualTo("CLASSMATE")
 
         restTestClient.post()
             .uri("/api/auth/token/refresh")
@@ -168,7 +168,7 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.id").isEqualTo(1)
             .jsonPath("$.email").isEqualTo("student@example.com")
             .jsonPath("$.name").isEqualTo("홍길동")
-            .jsonPath("$.role").isEqualTo("STUDENT")
+            .jsonPath("$.role").isEqualTo("CLASSMATE")
             .jsonPath("$.status").isEqualTo("ACTIVE")
     }
 
