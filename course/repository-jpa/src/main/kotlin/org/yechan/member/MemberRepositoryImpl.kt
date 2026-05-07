@@ -1,8 +1,5 @@
 package org.yechan.member
 
-import org.springframework.stereotype.Repository
-
-@Repository
 class MemberRepositoryImpl(
     private val memberJpaRepository: MemberJpaRepository,
 ) : MemberRepository {
