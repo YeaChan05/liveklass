@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
+import java.time.Duration
 
 @SpringBootTest(
     classes = [
@@ -88,6 +89,19 @@ class CommonSecurityAutoConfigurationTest {
             .expectStatus().isOk
             .expectBody<String>()
             .isEqualTo("1")
+    }
+
+    @Test
+    fun `블랙리스트에 등록된 토큰 요청은 인증 실패로 거부된다`() {
+        val token = tokenGenerator.generate(1L).accessToken
+        context.getBean(AccessTokenBlacklist::class.java).blacklist(token, Duration.ofMinutes(10))
+
+        restTestClient.get()
+            .uri("/secure")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+            .exchange()
+            .expectStatus().isUnauthorized
     }
 
     @Test
@@ -165,6 +179,9 @@ class CommonSecurityAutoConfigurationTest {
         }
 
         @Bean
+        fun accessTokenBlacklist(): AccessTokenBlacklist = FakeAccessTokenBlacklist()
+
+        @Bean
         fun applicationOpenEndpointPolicy(): ApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
             additionalMatchers =
             listOf(
@@ -177,5 +194,18 @@ class CommonSecurityAutoConfigurationTest {
             0,
             ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(policy),
         )
+    }
+
+    private class FakeAccessTokenBlacklist : AccessTokenBlacklist {
+        private val tokens = mutableSetOf<String>()
+
+        override fun blacklist(
+            token: String,
+            ttl: Duration,
+        ) {
+            tokens += token
+        }
+
+        override fun contains(token: String): Boolean = tokens.contains(token)
     }
 }

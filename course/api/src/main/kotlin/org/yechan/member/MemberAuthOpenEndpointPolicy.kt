@@ -17,9 +17,9 @@ class MemberAuthOpenEndpointPolicy {
     fun memberApplicationOpenEndpointPolicy(): ApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
         additionalMatchers =
         listOf(
-            OpenEndpointMatcher(HttpMethod.POST, "/api/v1/auth/signup"),
-            OpenEndpointMatcher(HttpMethod.POST, "/api/v1/auth/login"),
-            OpenEndpointMatcher(HttpMethod.POST, "/api/v1/auth/token/refresh"),
+            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/signup"),
+            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/login"),
+            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/token/refresh"),
         ),
     )
 

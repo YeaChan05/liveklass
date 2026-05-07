@@ -47,6 +47,10 @@ class CommonSecurityBeanRegistrar :
             JwtTokenVerifier(bean<AuthTokenProperties>().salt)
         }
 
+        registerBean<TokenExpirationResolver> {
+            JwtTokenExpirationResolver(bean<AuthTokenProperties>().salt)
+        }
+
         registerBean<AuthenticationEntryPoint> {
             DefaultAuthenticationEntryPoint()
         }
@@ -59,6 +63,7 @@ class CommonSecurityBeanRegistrar :
             JwtAuthenticationFilter(
                 bean(),
                 bean(),
+                beanProvider<AccessTokenBlacklist>().ifAvailable ?: NoOpAccessTokenBlacklist,
                 bean(),
             )
         }

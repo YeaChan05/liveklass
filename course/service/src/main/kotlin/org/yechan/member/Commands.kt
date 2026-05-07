@@ -16,6 +16,11 @@ data class RefreshTokenCommand(
     val refreshToken: String,
 )
 
+data class LogoutCommand(
+    val userId: Long,
+    val accessToken: String,
+)
+
 data class SignupResult(
     val userId: Long,
     val email: String,

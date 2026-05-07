@@ -5,9 +5,11 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.yechan.AuthTokenProperties
 import org.yechan.PasswordHashEncoder
+import org.yechan.TokenExpirationResolver
 import org.yechan.TokenGenerator
 import org.yechan.TokenVerifier
 import java.security.MessageDigest
+import java.time.Duration
 import java.time.LocalDateTime
 
 interface MemberAuthUseCase {
@@ -16,6 +18,8 @@ interface MemberAuthUseCase {
     fun login(command: LoginCommand): LoginResult
 
     fun refresh(command: RefreshTokenCommand): RefreshTokenResult
+
+    fun logout(command: LogoutCommand)
 
     fun getCurrentUser(userId: Long): CurrentMemberResult
 }
@@ -28,6 +32,8 @@ class MemberAuthService(
     private val passwordHashEncoder: PasswordHashEncoder,
     private val tokenGenerator: TokenGenerator,
     private val tokenVerifier: TokenVerifier,
+    private val tokenExpirationResolver: TokenExpirationResolver,
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
     private val authTokenProperties: AuthTokenProperties,
 ) : MemberAuthUseCase {
     @Transactional
@@ -94,20 +100,15 @@ class MemberAuthService(
         val userId = authentication.name.toLongOrNull()
             ?: throw InvalidRefreshTokenException()
 
-        val refreshToken = refreshTokenRepository.findByTokenHash(command.refreshToken.toRefreshTokenHash())
-            ?: throw InvalidRefreshTokenException()
-        if (refreshToken.userId != userId) {
-            throw InvalidRefreshTokenException()
-        }
-        if (refreshToken.expiresAt.isBefore(LocalDateTime.now())) {
-            throw InvalidRefreshTokenException()
-        }
+        val refreshToken =
+            refreshTokenRepository.findByTokenHash(command.refreshToken.toRefreshTokenHash())
+                ?: throw InvalidRefreshTokenException()
+        validateUserIdMatch(refreshToken, userId)
+        verifyTokenExpiry(refreshToken)
 
         val member = memberRepository.findById(userId)
             ?: throw InvalidRefreshTokenException()
-        if (member.status != MemberStatus.ACTIVE) {
-            throw InvalidRefreshTokenException()
-        }
+        member.validateMemberStatus()
 
         val token = tokenGenerator.generate(requireNotNull(member.memberId))
         return RefreshTokenResult(
@@ -115,6 +116,16 @@ class MemberAuthService(
             tokenType = TOKEN_TYPE,
             expiresIn = token.expiresIn,
         )
+    }
+
+    @Transactional
+    override fun logout(command: LogoutCommand) {
+        accessTokenBlacklistRepository.blacklist(
+            command.accessToken,
+            tokenExpirationResolver.remainingTime(command.accessToken)
+                .plus(LOGOUT_BLACKLIST_TTL_MARGIN),
+        )
+        refreshTokenRepository.deleteByUserId(command.userId)
     }
 
     override fun getCurrentUser(userId: Long): CurrentMemberResult {
@@ -138,6 +149,7 @@ class MemberAuthService(
 
     private companion object {
         const val TOKEN_TYPE = "Bearer"
+        val LOGOUT_BLACKLIST_TTL_MARGIN: Duration = Duration.ofMinutes(1)
     }
 }
 

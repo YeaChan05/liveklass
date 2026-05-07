@@ -41,10 +41,17 @@ class MemberAuthControllerTest @Autowired constructor(
     @Test
     fun `회원가입은 요청을 검증하고 생성된 회원을 반환한다`() {
         restTestClient.post()
-            .uri("/api/v1/auth/signup")
+            .uri("/api/auth/signup")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("email" to "invalid-email", "password" to "short", "name" to "김", "role" to "ADMIN"))
+            .body(
+                mapOf(
+                    "email" to "invalid-email",
+                    "password" to "short",
+                    "name" to "김",
+                    "role" to "ADMIN",
+                ),
+            )
             .exchange()
             .expectStatus().isBadRequest
             .expectBody<String>()
@@ -57,10 +64,17 @@ class MemberAuthControllerTest @Autowired constructor(
             }
 
         restTestClient.post()
-            .uri("/api/v1/auth/signup")
+            .uri("/api/auth/signup")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("email" to "student@example.com", "password" to "password1234!", "name" to "홍길동", "role" to "STUDENT"))
+            .body(
+                mapOf(
+                    "email" to "student@example.com",
+                    "password" to "password1234!",
+                    "name" to "홍길동",
+                    "role" to "STUDENT",
+                ),
+            )
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -75,7 +89,7 @@ class MemberAuthControllerTest @Autowired constructor(
         val beforeLoginCalls = memberAuthService.loginCalls
 
         restTestClient.post()
-            .uri("/api/v1/auth/login")
+            .uri("/api/auth/login")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("email" to "invalid-email", "password" to ""))
@@ -89,7 +103,7 @@ class MemberAuthControllerTest @Autowired constructor(
         assert(memberAuthService.loginCalls == beforeLoginCalls)
 
         restTestClient.post()
-            .uri("/api/v1/auth/login")
+            .uri("/api/auth/login")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("email" to "missing@example.com", "password" to "password1234!"))
@@ -104,7 +118,7 @@ class MemberAuthControllerTest @Autowired constructor(
         val accessToken = tokenGenerator.generate(1L).accessToken
 
         restTestClient.post()
-            .uri("/api/v1/auth/login")
+            .uri("/api/auth/login")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("email" to "student@example.com", "password" to "password1234!"))
@@ -118,7 +132,7 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.user.role").isEqualTo("STUDENT")
 
         restTestClient.post()
-            .uri("/api/v1/auth/token/refresh")
+            .uri("/api/auth/token/refresh")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("refreshToken" to "refresh-1"))
@@ -131,7 +145,7 @@ class MemberAuthControllerTest @Autowired constructor(
 
         val beforeRefreshCalls = memberAuthService.refreshCalls
         restTestClient.post()
-            .uri("/api/v1/auth/token/refresh")
+            .uri("/api/auth/token/refresh")
             .header("X-API-Version", "v1")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("refreshToken" to ""))
@@ -145,7 +159,7 @@ class MemberAuthControllerTest @Autowired constructor(
         assert(memberAuthService.refreshCalls == beforeRefreshCalls)
 
         restTestClient.get()
-            .uri("/api/v1/auth/me")
+            .uri("/api/auth/me")
             .header("X-API-Version", "v1")
             .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
             .exchange()
@@ -156,6 +170,22 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.name").isEqualTo("홍길동")
             .jsonPath("$.role").isEqualTo("STUDENT")
             .jsonPath("$.status").isEqualTo("ACTIVE")
+    }
+
+    @Test
+    fun `로그아웃은 인증된 액세스 토큰을 전달한다`() {
+        val accessToken = tokenGenerator.generate(1L).accessToken
+
+        restTestClient.post()
+            .uri("/api/auth/logout")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .exchange()
+            .expectStatus().isNoContent
+
+        assert(memberAuthService.logoutCalls == 1)
+        assert(memberAuthService.logoutUserId == 1L)
+        assert(memberAuthService.logoutAccessToken == accessToken)
     }
 
     @SpringBootConfiguration
@@ -188,6 +218,12 @@ class MemberAuthControllerTest @Autowired constructor(
             private set
         var refreshCalls = 0
             private set
+        var logoutCalls = 0
+            private set
+        var logoutUserId: Long? = null
+            private set
+        var logoutAccessToken: String? = null
+            private set
 
         override fun signup(command: SignupCommand): SignupResult = SignupResult(1, command.email, command.name.trim(), command.role)
 
@@ -208,6 +244,12 @@ class MemberAuthControllerTest @Autowired constructor(
         override fun refresh(command: RefreshTokenCommand): RefreshTokenResult {
             refreshCalls += 1
             return RefreshTokenResult("access-1-new", "Bearer", 1800)
+        }
+
+        override fun logout(command: LogoutCommand) {
+            logoutCalls += 1
+            logoutUserId = command.userId
+            logoutAccessToken = command.accessToken
         }
 
         override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(

@@ -10,8 +10,10 @@ import org.yechan.AuthTokenProperties
 import org.yechan.AuthTokenValue
 import org.yechan.BusinessException
 import org.yechan.PasswordHashEncoder
+import org.yechan.TokenExpirationResolver
 import org.yechan.TokenGenerator
 import org.yechan.TokenVerifier
+import java.time.Duration
 import java.time.LocalDateTime
 import java.util.Collections
 
@@ -21,13 +23,31 @@ class MemberAuthServiceTest {
     private val passwordHashEncoder = FakePasswordHashEncoder()
     private val tokenGenerator = FakeTokenGenerator()
     private val tokenVerifier = FakeTokenVerifier()
+    private val tokenExpirationResolver = FakeTokenExpirationResolver()
+    private val accessTokenBlacklistRepository = FakeAccessTokenBlacklistRepository()
     private val authTokenProperties = AuthTokenProperties("test-salt", 1800, 604800)
     private val service =
-        MemberAuthService(members, refreshTokens, passwordHashEncoder, tokenGenerator, tokenVerifier, authTokenProperties)
+        MemberAuthService(
+            members,
+            refreshTokens,
+            passwordHashEncoder,
+            tokenGenerator,
+            tokenVerifier,
+            tokenExpirationResolver,
+            accessTokenBlacklistRepository,
+            authTokenProperties,
+        )
 
     @Test
     fun `회원가입은 해시된 비밀번호로 활성 회원을 저장한다`() {
-        val result = service.signup(SignupCommand("student@example.com", "password1234!", " 홍길동 ", MemberRole.STUDENT))
+        val result = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                " 홍길동 ",
+                MemberRole.STUDENT,
+            ),
+        )
 
         val saved = members.findByEmail("student@example.com")
         assertThat(result.email).isEqualTo("student@example.com")
@@ -40,10 +60,24 @@ class MemberAuthServiceTest {
 
     @Test
     fun `회원가입은 중복 이메일을 거부한다`() {
-        service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
 
         assertThatThrownBy {
-            service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+            service.signup(
+                SignupCommand(
+                    "student@example.com",
+                    "password1234!",
+                    "홍길동",
+                    MemberRole.STUDENT,
+                ),
+            )
         }
             .isInstanceOf(BusinessException::class.java)
             .hasMessage("이미 사용 중인 이메일입니다.")
@@ -51,7 +85,14 @@ class MemberAuthServiceTest {
 
     @Test
     fun `로그인은 토큰을 반환하고 이전 리프레시 토큰을 교체한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
 
         val result = service.login(LoginCommand("student@example.com", "password1234!"))
 
@@ -61,13 +102,22 @@ class MemberAuthServiceTest {
         assertThat(result.expiresIn).isEqualTo(1800)
         assertThat(result.user.email).isEqualTo("student@example.com")
         assertThat(refreshTokens.savedByUserId(member.userId)).hasSize(1)
-        assertThat(refreshTokens.savedByUserId(member.userId).single().tokenHash).isNotEqualTo("refresh-${member.userId}")
+        assertThat(
+            refreshTokens.savedByUserId(member.userId).single().tokenHash,
+        ).isNotEqualTo("refresh-${member.userId}")
         assertThat(refreshTokens.savedByUserId(member.userId).single().tokenHash).isNotBlank()
     }
 
     @Test
     fun `로그인은 이메일과 비밀번호 중 무엇이 틀렸는지 숨긴다`() {
-        service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
 
         assertThatThrownBy { service.login(LoginCommand("student@example.com", "wrong-password")) }
             .isInstanceOf(BusinessException::class.java)
@@ -79,8 +129,38 @@ class MemberAuthServiceTest {
     }
 
     @Test
+    fun `로그아웃은 액세스 토큰을 블랙리스트에 등록하고 리프레시 토큰을 삭제한다`() {
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
+        val loginResult = service.login(LoginCommand("student@example.com", "password1234!"))
+
+        service.logout(LogoutCommand(member.userId, loginResult.accessToken))
+
+        assertThat(accessTokenBlacklistRepository.contains(loginResult.accessToken)).isTrue()
+        assertThat(accessTokenBlacklistRepository.ttlOf(loginResult.accessToken)).isEqualTo(
+            Duration.ofMinutes(
+                6,
+            ),
+        )
+        assertThat(refreshTokens.findByUserId(member.userId)).isNull()
+    }
+
+    @Test
     fun `로그인은 삭제된 회원을 거부한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
         members.updateStatus(member.userId, MemberStatus.DELETED)
 
         assertThatThrownBy { service.login(LoginCommand("student@example.com", "password1234!")) }
@@ -90,7 +170,14 @@ class MemberAuthServiceTest {
 
     @Test
     fun `액세스 토큰 재발급은 저장된 일치 리프레시 토큰을 요구한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
 
         val refreshed = service.refresh(RefreshTokenCommand(login.refreshToken))
@@ -106,7 +193,14 @@ class MemberAuthServiceTest {
 
     @Test
     fun `재발급은 저장된 토큰의 사용자가 다르면 거부한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
         refreshTokens.replaceSavedToken(member.userId, userId = 999L)
 
@@ -117,9 +211,19 @@ class MemberAuthServiceTest {
 
     @Test
     fun `재발급은 만료된 저장 토큰을 거부한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
-        refreshTokens.replaceSavedToken(member.userId, expiresAt = LocalDateTime.now().minusSeconds(1))
+        refreshTokens.replaceSavedToken(
+            member.userId,
+            expiresAt = LocalDateTime.now().minusSeconds(1),
+        )
 
         assertThatThrownBy { service.refresh(RefreshTokenCommand(login.refreshToken)) }
             .isInstanceOf(BusinessException::class.java)
@@ -128,7 +232,14 @@ class MemberAuthServiceTest {
 
     @Test
     fun `재발급은 회원이 없거나 삭제된 경우 거부한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
         val login = service.login(LoginCommand("student@example.com", "password1234!"))
 
         members.delete(member.userId)
@@ -136,13 +247,20 @@ class MemberAuthServiceTest {
             .isInstanceOf(BusinessException::class.java)
             .hasMessage("유효하지 않은 Refresh Token입니다.")
 
-        val deletedMember = service.signup(SignupCommand("deleted@example.com", "password1234!", "이삭제", MemberRole.STUDENT))
+        val deletedMember = service.signup(
+            SignupCommand(
+                "deleted@example.com",
+                "password1234!",
+                "이삭제",
+                MemberRole.STUDENT,
+            ),
+        )
         val deletedLogin = service.login(LoginCommand("deleted@example.com", "password1234!"))
         members.updateStatus(deletedMember.userId, MemberStatus.DELETED)
 
         assertThatThrownBy { service.refresh(RefreshTokenCommand(deletedLogin.refreshToken)) }
             .isInstanceOf(BusinessException::class.java)
-            .hasMessage("유효하지 않은 Refresh Token입니다.")
+            .hasMessage("비활성화된 회원입니다.")
     }
 
     @Test
@@ -156,7 +274,14 @@ class MemberAuthServiceTest {
 
     @Test
     fun `현재 사용자 조회는 활성 회원을 반환한다`() {
-        val member = service.signup(SignupCommand("student@example.com", "password1234!", "홍길동", MemberRole.STUDENT))
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.STUDENT,
+            ),
+        )
 
         val result = service.getCurrentUser(member.userId)
 
@@ -251,7 +376,30 @@ class MemberAuthServiceTest {
         override fun verify(token: String): Authentication {
             val userId = token.removePrefix("refresh-").takeIf { it != token }?.toLongOrNull()
                 ?: throw BadCredentialsException("Invalid token")
-            return UsernamePasswordAuthenticationToken(authenticationName ?: userId.toString(), token, Collections.emptyList())
+            return UsernamePasswordAuthenticationToken(
+                authenticationName ?: userId.toString(),
+                token,
+                Collections.emptyList(),
+            )
         }
+    }
+
+    private class FakeTokenExpirationResolver : TokenExpirationResolver {
+        override fun remainingTime(token: String): Duration = Duration.ofMinutes(5)
+    }
+
+    private class FakeAccessTokenBlacklistRepository : AccessTokenBlacklistRepository {
+        private val tokens = mutableMapOf<String, Duration>()
+
+        override fun blacklist(
+            token: String,
+            ttl: Duration,
+        ) {
+            tokens[token] = ttl
+        }
+
+        override fun contains(token: String): Boolean = tokens.containsKey(token)
+
+        fun ttlOf(token: String): Duration? = tokens[token]
     }
 }
