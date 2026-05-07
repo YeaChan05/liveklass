@@ -29,7 +29,7 @@ data class SignupRequest(
     @field:Size(min = 2, max = 30, message = "이름은 2자 이상 30자 이하로 입력해야 합니다.")
     val name: String = "",
     @field:NotBlank(message = "가입 가능한 권한이 아닙니다.")
-    @field:Pattern(regexp = "CREATOR|STUDENT", message = "가입 가능한 권한이 아닙니다.")
+    @field:Pattern(regexp = "CREATOR|CLASSMATE", message = "가입 가능한 권한이 아닙니다.")
     val role: String = "",
 ) {
     fun toCommand(): SignupCommand = SignupCommand(
