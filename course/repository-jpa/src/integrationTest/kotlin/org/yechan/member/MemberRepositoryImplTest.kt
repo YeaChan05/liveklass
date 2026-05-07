@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.TestPropertySource
+import org.yechan.course.CourseEntity
+import org.yechan.enrollment.EnrollmentEntity
 
 @DataJpaTest
 @Import(MemberRepositoryImpl::class)
@@ -105,7 +107,7 @@ class MemberRepositoryImplTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @EntityScan(basePackageClasses = [MemberEntity::class])
+    @EntityScan(basePackageClasses = [MemberEntity::class, CourseEntity::class, EnrollmentEntity::class])
     @EnableJpaRepositories(basePackageClasses = [MemberJpaRepository::class])
     class TestApplication
 }
