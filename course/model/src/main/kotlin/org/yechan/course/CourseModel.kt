@@ -13,6 +13,7 @@ interface CourseProps {
     val description: String
     val price: Money
     val capacity: Int
+    val seatLeftCount: Int
     val periodStart: LocalDateTime
     val periodEnd: LocalDateTime
     val status: CourseStatus
@@ -25,6 +26,7 @@ data class CourseModel(
     override val description: String,
     override val price: Money,
     override val capacity: Int,
+    override val seatLeftCount: Int = capacity,
     override val periodStart: LocalDateTime,
     override val periodEnd: LocalDateTime,
     override val status: CourseStatus = CourseStatus.DRAFT,
@@ -33,6 +35,7 @@ data class CourseModel(
     init {
         if (creatorId == null) throw IllegalArgumentException("강의 생성자는 필수입니다.")
         validateCapacity()
+        validateSeatLeftCount()
         if (!periodEnd.isAfter(periodStart)) throw IllegalArgumentException("수강 종료일은 시작일보다 빠를 수 없습니다.")
     }
 
@@ -46,12 +49,21 @@ data class CourseModel(
         return copy(status = CourseStatus.CLOSED)
     }
 
+    fun reserveSeat(): CourseModel {
+        validateIsOpen()
+        validateHasSeat()
+        return copy(seatLeftCount = seatLeftCount - 1)
+    }
+
+    fun releaseSeat(): CourseModel {
+        if (seatLeftCount >= capacity) throw IllegalArgumentException("남은 좌석 수는 정원을 초과할 수 없습니다.")
+        return copy(seatLeftCount = seatLeftCount + 1)
+    }
+
     fun requestEnrollment(
         memberId: Long,
-        currentEnrollmentCount: Int,
     ): EnrollmentModel {
         validateIsOpen()
-        validateCapacity(currentEnrollmentCount)
         return EnrollmentModel(
             courseId = courseId ?: throw IllegalArgumentException("저장된 강의만 신청할 수 있습니다."),
             memberId = memberId,
@@ -70,8 +82,13 @@ data class CourseModel(
         if (capacity <= 0) throw IllegalArgumentException("강의 정원은 1명 이상이어야 합니다.")
     }
 
-    private fun validateCapacity(currentEnrollmentCount: Int) {
-        if (currentEnrollmentCount >= capacity) throw IllegalArgumentException("강의 정원을 초과할 수 없습니다.")
+    private fun validateSeatLeftCount() {
+        if (seatLeftCount < 0) throw IllegalArgumentException("남은 좌석 수는 0보다 작을 수 없습니다.")
+        if (seatLeftCount > capacity) throw IllegalArgumentException("남은 좌석 수는 정원을 초과할 수 없습니다.")
+    }
+
+    private fun validateHasSeat() {
+        if (seatLeftCount <= 0) throw IllegalArgumentException("강의 정원을 초과할 수 없습니다.")
     }
 }
 
