@@ -1,0 +1,45 @@
+package org.yechan
+
+import org.springframework.beans.factory.BeanRegistrarDsl
+import org.springframework.boot.autoconfigure.AutoConfiguration
+import org.springframework.context.annotation.Import
+import org.yechan.course.CourseService
+import org.yechan.course.CourseUseCase
+import org.yechan.enrollment.EnrollmentService
+import org.yechan.enrollment.EnrollmentUseCase
+import org.yechan.member.MemberAuthService
+import org.yechan.member.MemberAuthUseCase
+
+@Import(ServiceBeanRegistrar::class)
+@AutoConfiguration
+class ServiceAutoConfiguration
+class ServiceBeanRegistrar :
+    BeanRegistrarDsl({
+        registerBean<CourseUseCase> {
+            CourseService(
+                bean(),
+                bean(),
+            )
+        }
+
+        registerBean<EnrollmentUseCase> {
+            EnrollmentService(
+                bean(),
+                bean(),
+                bean(),
+            )
+        }
+
+        registerBean<MemberAuthUseCase> {
+            MemberAuthService(
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+            )
+        }
+    })

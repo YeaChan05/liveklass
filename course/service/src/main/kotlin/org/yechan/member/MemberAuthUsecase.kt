@@ -1,7 +1,6 @@
 package org.yechan.member
 
 import org.springframework.security.authentication.BadCredentialsException
-import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.yechan.AuthTokenProperties
 import org.yechan.PasswordHashEncoder
@@ -24,7 +23,6 @@ interface MemberAuthUseCase {
     fun getCurrentUser(userId: Long): CurrentMemberResult
 }
 
-@Service
 @Transactional(readOnly = true)
 class MemberAuthService(
     private val memberRepository: MemberRepository,
