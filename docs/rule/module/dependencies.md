@@ -32,7 +32,7 @@
     - 비즈니스 핵심 개념과 규칙
 - 의존 가능
 
-    - (필요 시) 다른 도메인의 `model`
+    - (필요 시)`exception`
 - 의존 금지
 
     - infrastructure / service / api / repository / application
@@ -40,6 +40,7 @@
 ```kotlin
 dependencies {
     // 기본적으로 의존 없음
+    implementation(project(":{domain}:model"))
 }
 ```
 
