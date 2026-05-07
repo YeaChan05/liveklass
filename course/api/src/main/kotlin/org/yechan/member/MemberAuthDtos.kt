@@ -1,17 +1,9 @@
-package org.yechan.member.dto
+package org.yechan.member
 
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
-import org.yechan.member.CurrentMemberResult
-import org.yechan.member.LoginResult
-import org.yechan.member.MemberRole
-import org.yechan.member.MemberStatus
-import org.yechan.member.MemberSummary
-import org.yechan.member.RefreshTokenResult
-import org.yechan.member.SignupCommand
-import org.yechan.member.SignupResult
 
 data class SignupRequest(
     @field:NotBlank(message = "올바른 이메일 형식이 아닙니다.")
