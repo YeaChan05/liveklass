@@ -16,6 +16,5 @@ dependencies {
         exclude(group = "com.google.protobuf", module = "protobuf-java")
     }
 
-    // liquibase
-    implementation("org.springframework.boot:spring-boot-starter-liquibase")
+    // test
 }
