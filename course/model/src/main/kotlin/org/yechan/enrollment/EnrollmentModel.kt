@@ -1,4 +1,4 @@
-package org.yechan.course
+package org.yechan.enrollment
 
 interface EnrollmentIdentifier {
     val enrollmentId: Long?

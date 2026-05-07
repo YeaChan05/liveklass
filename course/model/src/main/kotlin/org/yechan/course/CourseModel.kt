@@ -1,5 +1,6 @@
 package org.yechan.course
 
+import org.yechan.enrollment.EnrollmentModel
 import java.time.LocalDateTime
 
 interface CourseIdentifier {

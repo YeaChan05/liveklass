@@ -3,6 +3,8 @@ package org.yechan.course
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.yechan.enrollment.EnrollmentModel
+import org.yechan.enrollment.EnrollmentStatus
 
 class EnrollmentModelTest {
     @Test
