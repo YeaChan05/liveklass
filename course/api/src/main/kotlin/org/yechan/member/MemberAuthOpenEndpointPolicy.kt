@@ -1,31 +1,31 @@
 package org.yechan.member
 
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.BeanRegistrarDsl
+import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.core.Ordered
 import org.springframework.http.HttpMethod
-import org.yechan.ApplicationOpenEndpointPolicy
 import org.yechan.ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer
 import org.yechan.AuthorizeHttpRequestsCustomizer
 import org.yechan.OpenEndpointMatcher
 import org.yechan.PrioritizedAuthorizeHttpRequestsCustomizer
 import org.yechan.StaticApplicationOpenEndpointPolicy
 
-@Configuration
-class MemberAuthOpenEndpointPolicy {
-    @Bean
-    fun memberApplicationOpenEndpointPolicy(): ApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-        additionalMatchers =
-        listOf(
-            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/signup"),
-            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/login"),
-            OpenEndpointMatcher(HttpMethod.POST, "/api/auth/token/refresh"),
-        ),
-    )
+@AutoConfiguration
+class MemberAuthOpenEndpointPolicy :
+    BeanRegistrarDsl({
+        registerBean<AuthorizeHttpRequestsCustomizer> {
+            PrioritizedAuthorizeHttpRequestsCustomizer(
+                Ordered.HIGHEST_PRECEDENCE,
+                ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(memberApplicationOpenEndpointPolicy()),
+            )
+        }
+    })
 
-    @Bean
-    fun memberOpenEndpointCustomizer(policy: ApplicationOpenEndpointPolicy): AuthorizeHttpRequestsCustomizer = PrioritizedAuthorizeHttpRequestsCustomizer(
-        Ordered.HIGHEST_PRECEDENCE,
-        ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(policy),
-    )
-}
+private fun memberApplicationOpenEndpointPolicy(): StaticApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
+    additionalMatchers =
+    listOf(
+        OpenEndpointMatcher(HttpMethod.POST, "/api/auth/signup"),
+        OpenEndpointMatcher(HttpMethod.POST, "/api/auth/login"),
+        OpenEndpointMatcher(HttpMethod.POST, "/api/auth/token/refresh"),
+    ),
+)

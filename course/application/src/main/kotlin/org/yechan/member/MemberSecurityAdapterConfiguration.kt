@@ -1,17 +1,17 @@
 package org.yechan.member
 
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.BeanRegistrarDsl
+import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.yechan.AccessTokenBlacklist
 import java.time.Duration
 
-@Configuration(proxyBeanMethods = false)
-class MemberSecurityAdapterConfiguration {
-    @Bean
-    fun accessTokenBlacklist(
-        accessTokenBlacklistRedisRepository: AccessTokenBlacklistRedisRepository,
-    ): AccessTokenBlacklist = AccessTokenBlacklistAdapter(accessTokenBlacklistRedisRepository)
-}
+@AutoConfiguration
+class MemberSecurityAdapterConfiguration :
+    BeanRegistrarDsl({
+        registerBean<AccessTokenBlacklist> {
+            AccessTokenBlacklistAdapter(bean())
+        }
+    })
 
 private class AccessTokenBlacklistAdapter(
     private val accessTokenBlacklistRedisRepository: AccessTokenBlacklistRedisRepository,
