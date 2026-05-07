@@ -19,3 +19,15 @@ data class RefreshTokenModel(
     override val expiresAt: LocalDateTime,
 ) : RefreshTokenProps,
     RefreshTokenIdentifier
+
+fun verifyTokenExpiry(refreshToken: RefreshTokenModel) {
+    if (refreshToken.expiresAt.isBefore(LocalDateTime.now())) {
+        throw InvalidRefreshTokenException()
+    }
+}
+
+fun validateUserIdMatch(refreshToken: RefreshTokenModel, userId: Long) {
+    if (refreshToken.userId != userId) {
+        throw InvalidRefreshTokenException()
+    }
+}

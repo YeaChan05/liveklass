@@ -26,3 +26,9 @@ class MemberNotFoundException :
         Status.AUTHENTICATION_FAILED,
         "인증이 필요합니다.",
     )
+
+class InactiveMemberException :
+    BusinessException(
+        Status.FORBIDDEN,
+        "비활성화된 회원입니다.",
+    )

@@ -8,6 +8,7 @@ enum class Status {
     AUTHENTICATION_FAILED,
     ACCESS_DENIED,
     TOKEN_EXPIRED,
+    FORBIDDEN,
     ;
 
     fun toHttpStatus(): Int = when (this) {
@@ -18,5 +19,6 @@ enum class Status {
         ACCESS_DENIED -> 403
         TOKEN_EXPIRED -> 401
         INTERNAL_SERVER_ERROR -> 500
+        FORBIDDEN -> 403
     }
 }

@@ -20,7 +20,13 @@ data class MemberModel(
     override val role: MemberRole,
     override val status: MemberStatus = MemberStatus.ACTIVE,
 ) : MemberProps,
-    MemberIdentifier
+    MemberIdentifier {
+    fun validateMemberStatus() {
+        if (status != MemberStatus.ACTIVE) {
+            throw InactiveMemberException()
+        }
+    }
+}
 
 enum class MemberRole {
     CREATOR,
