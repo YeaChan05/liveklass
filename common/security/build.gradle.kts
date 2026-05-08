@@ -1,4 +1,5 @@
 dependencies {
+    api("org.springframework.boot:spring-boot-starter-security")
     implementation(project(":common:api"))
     implementation(project(":common:exception"))
     testImplementation("org.springframework.security:spring-security-test")
