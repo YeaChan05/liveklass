@@ -3,7 +3,6 @@ package org.yechan.course
 import java.time.LocalDateTime
 
 data class CreateCourseCommand(
-    val creatorId: Long,
     val title: String,
     val description: String,
     val price: Money,

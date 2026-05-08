@@ -10,7 +10,7 @@ interface CourseUseCase {
 
     fun getCourses(): List<CourseResult>
 
-    fun createCourse(command: CreateCourseCommand): CourseResult
+    fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult
 
     fun openCourse(command: CourseStatusCommand): CourseResult
 
@@ -29,8 +29,8 @@ class CourseService(
     override fun getCourses(): List<CourseResult> = courseRepository.findAll().map(CourseResult::from)
 
     @Transactional
-    override fun createCourse(command: CreateCourseCommand): CourseResult {
-        val creator = activeMember(command.creatorId)
+    override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult {
+        val creator = activeMember(creatorId)
         val course = CourseModel(
             creatorId = requireNotNull(creator.memberId),
             title = command.title,
