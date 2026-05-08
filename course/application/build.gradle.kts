@@ -15,8 +15,4 @@ dependencies {
 
     // spring boot dev tools
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")
-
-    // test
-    testImplementation("org.testcontainers:mysql")
-    testImplementation("org.testcontainers:testcontainers-jdbc")
 }
