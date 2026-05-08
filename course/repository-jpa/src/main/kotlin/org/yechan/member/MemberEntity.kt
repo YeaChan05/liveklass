@@ -4,11 +4,8 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
-import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import org.yechan.BaseEntity
-import org.yechan.course.CourseEntity
-import org.yechan.enrollment.EnrollmentEntity
 
 @Entity
 @Table(name = "members")
@@ -26,11 +23,6 @@ class MemberEntity private constructor(
     @field:Column(nullable = false, length = 20)
     var status: MemberStatus,
 ) : BaseEntity() {
-    @field:OneToMany(mappedBy = "creator")
-    val courses: MutableList<CourseEntity> = mutableListOf()
-
-    @field:OneToMany(mappedBy = "member")
-    val enrollments: MutableList<EnrollmentEntity> = mutableListOf()
 
     companion object {
         fun from(member: MemberModel): MemberEntity = MemberEntity(
