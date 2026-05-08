@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
@@ -18,7 +19,6 @@ import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
-import org.yechan.CourseRoleHierarchyConfiguration
 import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
 import org.yechan.member.MemberRole
@@ -170,6 +170,7 @@ class CourseControllerTest @Autowired constructor(
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = ["CREATOR"])
     fun `관리자는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
         val accessToken =
             tokenGenerator.generate(3L, roles = setOf(MemberRole.ADMIN.name)).accessToken
@@ -201,7 +202,6 @@ class CourseControllerTest @Autowired constructor(
         CourseController::class,
         CourseAuthorizationPolicy::class,
         CourseOpenEndpointPolicy::class,
-        CourseRoleHierarchyConfiguration::class,
     )
     class TestApplication
 
@@ -224,7 +224,7 @@ class CourseControllerTest @Autowired constructor(
     }
 
     class FakeCourseUseCase : CourseUseCase {
-        override fun createCourse(command: CreateCourseCommand): CourseResult = course(status = CourseStatus.DRAFT)
+        override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult = course(status = CourseStatus.DRAFT)
 
         override fun openCourse(command: CourseStatusCommand): CourseResult = course(status = CourseStatus.OPEN)
 
