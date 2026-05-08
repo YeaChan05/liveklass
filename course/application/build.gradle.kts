@@ -9,12 +9,14 @@ dependencies {
     implementation(project(":course:repository-redis"))
     implementation(project(":course:schema"))
 
-    // testcontainers
-    implementation("org.testcontainers:testcontainers-jdbc")
-    implementation("org.testcontainers:testcontainers-mysql")
-    runtimeOnly("com.mysql:mysql-connector-j") {
+    compileOnly("com.mysql:mysql-connector-j") {
         exclude(group = "com.google.protobuf", module = "protobuf-java")
     }
 
+    // spring boot dev tools
+    developmentOnly("org.springframework.boot:spring-boot-docker-compose")
+
     // test
+    testImplementation("org.testcontainers:mysql")
+    testImplementation("org.testcontainers:testcontainers-jdbc")
 }
