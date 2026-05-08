@@ -26,8 +26,7 @@ data class CreateCourseRequest(
     @field:Future(message = "수강 종료일은 미래여야 합니다.")
     val periodEnd: LocalDateTime? = null,
 ) {
-    fun toCommand(creatorId: Long): CreateCourseCommand = CreateCourseCommand(
-        creatorId = creatorId,
+    fun toCommand(): CreateCourseCommand = CreateCourseCommand(
         title = title.trim(),
         description = description.trim(),
         price = Money(requireNotNull(price)),
@@ -39,7 +38,6 @@ data class CreateCourseRequest(
 
 data class CourseResponse(
     val courseId: Long,
-    val creatorId: Long,
     val title: String,
     val description: String,
     val price: BigDecimal,
