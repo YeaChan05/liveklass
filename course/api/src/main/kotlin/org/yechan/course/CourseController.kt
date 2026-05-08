@@ -26,7 +26,7 @@ class CourseController(
     fun createCourse(
         @LoginUserId userId: Long,
         @RequestBody @Valid request: CreateCourseRequest,
-    ): CourseResponse = courseUseCase.createCourse(request.toCommand(), userId).toResponse()
+    ): CourseResponse = courseUseCase.createCourse(creatorId = userId, command = request.toCommand()).toResponse()
 
     @PostMapping("/courses/{courseId}/open")
     fun openCourse(

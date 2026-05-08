@@ -16,11 +16,11 @@ class CourseAuthorizationPolicy :
                 Ordered.HIGHEST_PRECEDENCE + 100,
             ) { registry ->
                 registry.requestMatchers(HttpMethod.POST, "/api/courses")
-                    .hasRole(MemberRole.CREATOR.name)
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.ADMIN.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/open")
-                    .hasRole(MemberRole.CREATOR.name)
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.ADMIN.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/close")
-                    .hasRole(MemberRole.CREATOR.name)
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.ADMIN.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/enrollments")
                     .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/enrollments/{enrollmentId}/confirm")
