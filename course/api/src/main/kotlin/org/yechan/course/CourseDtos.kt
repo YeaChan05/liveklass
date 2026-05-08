@@ -48,19 +48,4 @@ data class CourseResponse(
     val periodStart: LocalDateTime,
     val periodEnd: LocalDateTime,
     val status: CourseStatus,
-) {
-    companion object {
-        fun from(result: CourseResult): CourseResponse = CourseResponse(
-            courseId = result.courseId,
-            creatorId = result.creatorId,
-            title = result.title,
-            description = result.description,
-            price = result.price.amount,
-            capacity = result.capacity,
-            seatLeftCount = result.seatLeftCount,
-            periodStart = result.periodStart,
-            periodEnd = result.periodEnd,
-            status = result.status,
-        )
-    }
-}
+)

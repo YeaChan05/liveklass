@@ -17,26 +17,39 @@ class CourseController(
     @GetMapping("/courses/{courseId}")
     fun getCourse(
         @PathVariable courseId: Long,
-    ): CourseResponse = CourseResponse.from(courseUseCase.getCourse(courseId))
+    ): CourseResponse = courseUseCase.getCourse(courseId).toResponse()
 
     @GetMapping("/courses")
-    fun getCourses(): List<CourseResponse> = courseUseCase.getCourses().map(CourseResponse::from)
+    fun getCourses(): List<CourseResponse> = courseUseCase.getCourses().map(CourseResult::toResponse)
 
     @PostMapping("/courses")
     fun createCourse(
         @LoginUserId userId: Long,
         @RequestBody @Valid request: CreateCourseRequest,
-    ): CourseResponse = CourseResponse.from(courseUseCase.createCourse(request.toCommand(userId)))
+    ): CourseResponse = courseUseCase.createCourse(request.toCommand(userId)).toResponse()
 
     @PostMapping("/courses/{courseId}/open")
     fun openCourse(
         @LoginUserId userId: Long,
         @PathVariable courseId: Long,
-    ): CourseResponse = CourseResponse.from(courseUseCase.openCourse(CourseStatusCommand(userId, courseId)))
+    ): CourseResponse = courseUseCase.openCourse(CourseStatusCommand(userId, courseId)).toResponse()
 
     @PostMapping("/courses/{courseId}/close")
     fun closeCourse(
         @LoginUserId userId: Long,
         @PathVariable courseId: Long,
-    ): CourseResponse = CourseResponse.from(courseUseCase.closeCourse(CourseStatusCommand(userId, courseId)))
+    ): CourseResponse = courseUseCase.closeCourse(CourseStatusCommand(userId, courseId)).toResponse()
 }
+
+private fun CourseResult.toResponse(): CourseResponse = CourseResponse(
+    courseId = courseId,
+    creatorId = creatorId,
+    title = title,
+    description = description,
+    price = price.amount,
+    capacity = capacity,
+    seatLeftCount = seatLeftCount,
+    periodStart = periodStart,
+    periodEnd = periodEnd,
+    status = status,
+)
