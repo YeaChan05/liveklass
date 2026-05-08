@@ -3,6 +3,7 @@ package org.yechan.course
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -20,7 +21,9 @@ class CourseController(
     ): CourseResponse = courseUseCase.getCourse(courseId).toResponse()
 
     @GetMapping("/courses")
-    fun getCourses(): List<CourseResponse> = courseUseCase.getCourses().map(CourseResult::toResponse)
+    fun getCourses(
+        @RequestParam(required = false) status: CourseStatus? = null,
+    ): List<CourseResponse> = courseUseCase.getCourses(status).map(CourseResult::toResponse)
 
     @PostMapping("/courses")
     fun createCourse(
@@ -48,6 +51,7 @@ private fun CourseResult.toResponse(): CourseResponse = CourseResponse(
     price = price.amount,
     capacity = capacity,
     seatLeftCount = seatLeftCount,
+    currentEnrollmentCount = currentEnrollmentCount,
     periodStart = periodStart,
     periodEnd = periodEnd,
     status = status,

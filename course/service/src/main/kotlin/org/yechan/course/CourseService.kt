@@ -8,7 +8,7 @@ import org.yechan.member.MemberRepository
 interface CourseUseCase {
     fun getCourse(courseId: Long): CourseResult
 
-    fun getCourses(): List<CourseResult>
+    fun getCourses(status: CourseStatus? = null): List<CourseResult>
 
     fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult
 
@@ -26,12 +26,16 @@ class CourseService(
         courseRepository.findById(courseId) ?: throw CourseNotFoundException(),
     )
 
-    override fun getCourses(): List<CourseResult> = courseRepository.findAll().map(CourseResult::from)
+    override fun getCourses(status: CourseStatus?): List<CourseResult> = courseRepository.findAll()
+        .asSequence()
+        .filter { status == null || it.status == status }
+        .map(CourseResult::from)
+        .toList()
 
     @Transactional
     override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult {
         val creator = activeMember(creatorId)
-        val course = CourseModel(
+        val course = CourseModelData(
             creatorId = requireNotNull(creator.memberId),
             title = command.title,
             description = command.description,

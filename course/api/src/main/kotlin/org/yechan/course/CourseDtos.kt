@@ -43,6 +43,7 @@ data class CourseResponse(
     val price: BigDecimal,
     val capacity: Int,
     val seatLeftCount: Int,
+    val currentEnrollmentCount: Int,
     val periodStart: LocalDateTime,
     val periodEnd: LocalDateTime,
     val status: CourseStatus,

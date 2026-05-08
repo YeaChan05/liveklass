@@ -1,6 +1,7 @@
 package org.yechan.course
 
 import org.junit.jupiter.api.Test
+import org.assertj.core.api.Assertions.assertThat
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
@@ -9,8 +10,11 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.context.ApplicationContext
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
 import org.springframework.test.context.TestPropertySource
@@ -40,6 +44,7 @@ import java.time.LocalDateTime
 class CourseControllerTest @Autowired constructor(
     private val restTestClient: RestTestClient,
     private val tokenGenerator: TokenGenerator,
+    private val context: ApplicationContext,
 ) {
     @Test
     fun `강의 등록 모집 시작 마감 목록 상세 API를 제공한다`() {
@@ -96,6 +101,16 @@ class CourseControllerTest @Autowired constructor(
             .expectBody()
             .jsonPath("$[0].capacity").isEqualTo(2)
             .jsonPath("$[0].seatLeftCount").isEqualTo(1)
+            .jsonPath("$[0].currentEnrollmentCount").isEqualTo(1)
+
+        restTestClient.get()
+            .uri("/api/courses?status=OPEN")
+            .header("X-API-Version", "v1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$[0].status").isEqualTo("OPEN")
+            .jsonPath("$[0].currentEnrollmentCount").isEqualTo(1)
 
         restTestClient.get()
             .uri("/api/courses/1")
@@ -105,6 +120,7 @@ class CourseControllerTest @Autowired constructor(
             .expectBody()
             .jsonPath("$.capacity").isEqualTo(2)
             .jsonPath("$.seatLeftCount").isEqualTo(1)
+            .jsonPath("$.currentEnrollmentCount").isEqualTo(1)
     }
 
     @Test
@@ -170,6 +186,18 @@ class CourseControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `CREATOR 역할은 CLASSMATE 권한을 상속한다`() {
+        val roleHierarchy = context.getBean(RoleHierarchy::class.java)
+
+        val reachableAuthorities =
+            roleHierarchy.getReachableGrantedAuthorities(
+                listOf(SimpleGrantedAuthority("ROLE_CREATOR")),
+            ).mapNotNull { it.authority }
+
+        assertThat(reachableAuthorities).contains("ROLE_CLASSMATE")
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = ["CREATOR"])
     fun `관리자는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
         val accessToken =
@@ -230,7 +258,15 @@ class CourseControllerTest @Autowired constructor(
 
         override fun closeCourse(command: CourseStatusCommand): CourseResult = course(status = CourseStatus.CLOSED)
 
-        override fun getCourses(): List<CourseResult> = listOf(course(status = CourseStatus.CLOSED, seatLeftCount = 1))
+        override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
+            CourseStatus.OPEN -> listOf(course(status = CourseStatus.OPEN, seatLeftCount = 1))
+            CourseStatus.CLOSED -> listOf(course(status = CourseStatus.CLOSED, seatLeftCount = 1))
+            CourseStatus.DRAFT -> listOf(course(status = CourseStatus.DRAFT))
+            null -> listOf(
+                course(status = CourseStatus.OPEN, seatLeftCount = 1),
+                course(status = CourseStatus.CLOSED, seatLeftCount = 1),
+            )
+        }
 
         override fun getCourse(courseId: Long): CourseResult = course(status = CourseStatus.CLOSED, seatLeftCount = 1)
 
@@ -245,6 +281,7 @@ class CourseControllerTest @Autowired constructor(
             price = Money(100_000L),
             capacity = 2,
             seatLeftCount = seatLeftCount,
+            currentEnrollmentCount = 2 - seatLeftCount,
             periodStart = LocalDateTime.of(2026, 6, 1, 0, 0),
             periodEnd = LocalDateTime.of(2026, 6, 30, 0, 0),
             status = status,
