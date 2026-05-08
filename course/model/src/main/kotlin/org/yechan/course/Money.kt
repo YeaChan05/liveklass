@@ -7,9 +7,7 @@ data class Money(
     val amount: BigDecimal,
 ) {
     init {
-        require(amount >= BigDecimal.ZERO) {
-            "금액은 음수일 수 없습니다."
-        }
+        if (amount < BigDecimal.ZERO) throw CourseInvalidStateException("금액은 음수일 수 없습니다.")
     }
 
     constructor(amount: Long) : this(BigDecimal.valueOf(amount))
@@ -21,33 +19,25 @@ data class Money(
     operator fun minus(other: Money): Money {
         val result = this.amount - other.amount
 
-        require(result >= BigDecimal.ZERO) {
-            "결과 금액은 음수일 수 없습니다."
-        }
+        if (result < BigDecimal.ZERO) throw CourseInvalidStateException("결과 금액은 음수일 수 없습니다.")
 
         return Money(result)
     }
 
     operator fun times(multiplier: Int): Money {
-        require(multiplier >= 0) {
-            "곱셈의 배수는 음수일 수 없습니다."
-        }
+        if (multiplier < 0) throw CourseInvalidStateException("곱셈의 배수는 음수일 수 없습니다.")
 
         return Money(this.amount.multiply(BigDecimal.valueOf(multiplier.toLong())))
     }
 
     operator fun times(multiplier: Long): Money {
-        require(multiplier >= 0) {
-            "곱셈의 배수는 음수일 수 없습니다."
-        }
+        if (multiplier < 0) throw CourseInvalidStateException("곱셈의 배수는 음수일 수 없습니다.")
 
         return Money(this.amount.multiply(BigDecimal.valueOf(multiplier)))
     }
 
     operator fun div(divisor: Int): Money {
-        require(divisor > 0) {
-            "나눗셈의 분모는 양수여야 합니다."
-        }
+        if (divisor <= 0) throw CourseInvalidStateException("나눗셈의 분모는 양수여야 합니다.")
 
         return Money(
             this.amount.divide(
@@ -58,9 +48,7 @@ data class Money(
     }
 
     operator fun div(divisor: Long): Money {
-        require(divisor > 0) {
-            "나눗셈의 분모는 양수여야 합니다."
-        }
+        if (divisor <= 0) throw CourseInvalidStateException("나눗셈의 분모는 양수여야 합니다.")
 
         return Money(
             this.amount.divide(

@@ -11,7 +11,7 @@ class MoneyTest {
     fun `음수 금액으로 Money를 생성할 수 없다`() {
         assertThatThrownBy {
             Money(-100)
-        }.isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(CourseInvalidStateException::class.java)
     }
 
     @Test
@@ -43,7 +43,7 @@ class MoneyTest {
 
         assertThatThrownBy {
             money1 - money2
-        }.isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(CourseInvalidStateException::class.java)
     }
 
     @Test
@@ -72,7 +72,7 @@ class MoneyTest {
 
         assertThatThrownBy {
             money * -1
-        }.isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(CourseInvalidStateException::class.java)
     }
 
     @Test
@@ -101,7 +101,7 @@ class MoneyTest {
 
         assertThatThrownBy {
             money / 0
-        }.isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(CourseInvalidStateException::class.java)
     }
 
     @Test

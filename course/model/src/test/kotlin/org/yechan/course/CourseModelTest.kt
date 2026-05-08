@@ -24,7 +24,7 @@ class CourseModelTest {
     fun `초안 강의는 수강 신청을 거부한다`() {
         val course = course()
 
-        val exception = assertThrows(IllegalArgumentException::class.java) {
+        val exception = assertThrows(CourseInvalidStateException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
         assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
@@ -43,7 +43,7 @@ class CourseModelTest {
 
     @Test
     fun `초안 강의는 모집 전 마감할 수 없다`() {
-        val exception = assertThrows(IllegalArgumentException::class.java) { course().close() }
+        val exception = assertThrows(CourseInvalidStateException::class.java) { course().close() }
 
         assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
     }
@@ -52,7 +52,7 @@ class CourseModelTest {
     fun `마감된 강의는 다시 모집할 수 없다`() {
         val closed = course().open().close()
 
-        val exception = assertThrows(IllegalArgumentException::class.java) { closed.open() }
+        val exception = assertThrows(CourseInvalidStateException::class.java) { closed.open() }
 
         assertEquals("초안 상태의 강의만 모집할 수 있습니다.", exception.message)
     }
@@ -61,7 +61,7 @@ class CourseModelTest {
     fun `모집 중인 강의는 정원이 가득 차면 신청을 거부한다`() {
         val course = course().open()
 
-        val exception = assertThrows(IllegalArgumentException::class.java) {
+        val exception = assertThrows(CourseInvalidStateException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 2)
         }
         assertEquals("강의 정원을 초과할 수 없습니다.", exception.message)
@@ -71,7 +71,7 @@ class CourseModelTest {
     fun `마감된 강의는 수강 신청을 거부한다`() {
         val course = course().open().close()
 
-        val exception = assertThrows(IllegalArgumentException::class.java) {
+        val exception = assertThrows(CourseInvalidStateException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
         assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
@@ -79,7 +79,7 @@ class CourseModelTest {
 
     @Test
     fun `잘못된 수강 기간은 거부된다`() {
-        val exception = assertThrows(IllegalArgumentException::class.java) {
+        val exception = assertThrows(CourseInvalidStateException::class.java) {
             course(
                 periodStart = LocalDateTime.of(2026, 6, 30, 0, 0),
                 periodEnd = LocalDateTime.of(2026, 6, 1, 0, 0),
@@ -90,7 +90,7 @@ class CourseModelTest {
 
     @Test
     fun `강의 정원은 양수여야 한다`() {
-        val exception = assertThrows(IllegalArgumentException::class.java) { course(capacity = 0) }
+        val exception = assertThrows(CourseInvalidStateException::class.java) { course(capacity = 0) }
         assertEquals("강의 정원은 1명 이상이어야 합니다.", exception.message)
     }
 

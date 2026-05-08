@@ -28,7 +28,7 @@ class EnrollmentModelTest {
         val confirmed = enrollment().confirmPayment()
 
         val exception =
-            assertThrows(IllegalStateException::class.java) { confirmed.confirmPayment() }
+            assertThrows(CourseInvalidStateException::class.java) { confirmed.confirmPayment() }
         assertEquals("결제 대기 상태의 신청만 확정할 수 있습니다.", exception.message)
     }
 
@@ -37,7 +37,7 @@ class EnrollmentModelTest {
         val cancelled = enrollment().cancel()
 
         val exception =
-            assertThrows(IllegalStateException::class.java) { cancelled.confirmPayment() }
+            assertThrows(CourseInvalidStateException::class.java) { cancelled.confirmPayment() }
         assertEquals("결제 대기 상태의 신청만 확정할 수 있습니다.", exception.message)
     }
 
@@ -59,7 +59,7 @@ class EnrollmentModelTest {
     fun `취소된 신청은 다시 취소할 수 없다`() {
         val cancelled = enrollment().cancel()
 
-        val exception = assertThrows(IllegalStateException::class.java) { cancelled.cancel() }
+        val exception = assertThrows(CourseInvalidStateException::class.java) { cancelled.cancel() }
         assertEquals("이미 취소된 신청입니다.", exception.message)
     }
 
