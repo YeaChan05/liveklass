@@ -62,8 +62,12 @@ data class CourseModel(
 
     fun requestEnrollment(
         memberId: Long,
+        currentEnrollmentCount: Int? = null,
     ): EnrollmentModel {
         validateIsOpen()
+        if (currentEnrollmentCount != null && currentEnrollmentCount >= capacity) {
+            throw IllegalArgumentException("강의 정원을 초과할 수 없습니다.")
+        }
         return EnrollmentModel(
             courseId = courseId ?: throw IllegalArgumentException("저장된 강의만 신청할 수 있습니다."),
             memberId = memberId,
