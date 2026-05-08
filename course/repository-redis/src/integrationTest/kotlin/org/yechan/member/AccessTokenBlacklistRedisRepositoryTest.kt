@@ -1,24 +1,17 @@
 package org.yechan.member
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
-import org.springframework.data.redis.core.StringRedisTemplate
-import org.testcontainers.containers.GenericContainer
+import org.yechan.RedisIntegrationTest
 import java.time.Duration
 
-class AccessTokenBlacklistRedisRepositoryTest {
-    private lateinit var redisTemplate: StringRedisTemplate
+class AccessTokenBlacklistRedisRepositoryTest : RedisIntegrationTest() {
     private lateinit var repository: AccessTokenBlacklistRedisRepository
 
     @BeforeEach
     fun setUp() {
-        redisTemplate = StringRedisTemplate(connectionFactory)
-        redisTemplate.afterPropertiesSet()
-        redisTemplate.connectionFactory?.connection?.serverCommands()?.flushAll()
+        flushAll()
         repository = AccessTokenBlacklistRedisRepository(redisTemplate)
     }
 
@@ -33,28 +26,9 @@ class AccessTokenBlacklistRedisRepositoryTest {
     @Test
     fun `만료된 TTL은 블랙리스트에 등록하지 않는다`() {
         repository.blacklist("access-token", Duration.ZERO)
+        repository.blacklist("access-token-negative", Duration.ofSeconds(-1))
 
         assertThat(repository.contains("access-token")).isFalse()
-    }
-
-    companion object {
-        private val redis = GenericContainer("redis:7.4-alpine")
-            .withExposedPorts(6379)
-        private lateinit var connectionFactory: LettuceConnectionFactory
-
-        @BeforeAll
-        @JvmStatic
-        fun startRedis() {
-            redis.start()
-            connectionFactory = LettuceConnectionFactory(redis.host, redis.getMappedPort(6379))
-            connectionFactory.afterPropertiesSet()
-        }
-
-        @AfterAll
-        @JvmStatic
-        fun stopRedis() {
-            connectionFactory.destroy()
-            redis.stop()
-        }
+        assertThat(repository.contains("access-token-negative")).isFalse()
     }
 }

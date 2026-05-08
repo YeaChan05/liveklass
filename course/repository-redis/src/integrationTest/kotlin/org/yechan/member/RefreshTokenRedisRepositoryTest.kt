@@ -1,24 +1,17 @@
 package org.yechan.member
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
-import org.springframework.data.redis.core.StringRedisTemplate
-import org.testcontainers.containers.GenericContainer
+import org.yechan.RedisIntegrationTest
 import java.time.LocalDateTime
 
-class RefreshTokenRedisRepositoryTest {
-    private lateinit var redisTemplate: StringRedisTemplate
+class RefreshTokenRedisRepositoryTest : RedisIntegrationTest() {
     private lateinit var repository: RefreshTokenRedisRepository
 
     @BeforeEach
     fun setUp() {
-        redisTemplate = StringRedisTemplate(connectionFactory)
-        redisTemplate.afterPropertiesSet()
-        redisTemplate.connectionFactory?.connection?.serverCommands()?.flushAll()
+        flushAll()
         repository = RefreshTokenRedisRepository(redisTemplate)
     }
 
@@ -77,25 +70,4 @@ class RefreshTokenRedisRepositoryTest {
         tokenHash = tokenHash,
         expiresAt = expiresAt,
     )
-
-    companion object {
-        private val redis = GenericContainer("redis:7.4-alpine")
-            .withExposedPorts(6379)
-        private lateinit var connectionFactory: LettuceConnectionFactory
-
-        @JvmStatic
-        @BeforeAll
-        fun startRedis() {
-            redis.start()
-            connectionFactory = LettuceConnectionFactory(redis.host, redis.getMappedPort(6379))
-            connectionFactory.afterPropertiesSet()
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun stopRedis() {
-            connectionFactory.destroy()
-            redis.stop()
-        }
-    }
 }
