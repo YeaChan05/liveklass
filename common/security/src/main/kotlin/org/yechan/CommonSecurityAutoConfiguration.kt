@@ -7,6 +7,7 @@ import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.core.Ordered
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer
 import org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer
@@ -82,6 +83,7 @@ class CommonSecurityBeanRegistrar :
 
         registerBean<SecurityFilterChain> {
             val authorizeHttpRequestsCustomizers = beanProvider<AuthorizeHttpRequestsCustomizer>()
+            val roleHierarchy = beanProvider<RoleHierarchy>().ifAvailable
 
             bean<HttpSecurity>()
                 .formLogin(FormLoginConfigurer<HttpSecurity>::disable)
@@ -97,6 +99,12 @@ class CommonSecurityBeanRegistrar :
                     authorizeHttpRequestsCustomizers.orderedStream().forEach { customizer ->
                         customizer.customize(registry)
                     }
+                }
+                .let { http ->
+                    if (roleHierarchy != null) {
+                        http.setSharedObject(RoleHierarchy::class.java, roleHierarchy)
+                    }
+                    http
                 }
                 .addFilterBefore(
                     bean<JwtAuthenticationFilter>(),
