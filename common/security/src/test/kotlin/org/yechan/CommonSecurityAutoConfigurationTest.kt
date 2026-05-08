@@ -59,6 +59,17 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @Test
+    fun `토큰 생성기는 역할 없는 생성 메서드를 노출하지 않는다`() {
+        val generateMethods = TokenGenerator::class.java.methods
+            .filter { it.name == "generate" }
+
+        Assertions.assertThat(generateMethods)
+            .allSatisfy {
+                Assertions.assertThat(it.parameterCount).isEqualTo(2)
+            }
+    }
+
+    @Test
     fun `토큰이 없는 요청은 인증 실패로 거부된다`() {
         restTestClient.get()
             .uri("/secure")
@@ -79,7 +90,7 @@ class CommonSecurityAutoConfigurationTest {
 
     @Test
     fun `올바른 토큰 요청은 허용된다`() {
-        val token = tokenGenerator.generate(1L).accessToken
+        val token = tokenGenerator.generate(1L, roles = emptySet()).accessToken
 
         restTestClient.get()
             .uri("/secure")
@@ -127,7 +138,7 @@ class CommonSecurityAutoConfigurationTest {
 
     @Test
     fun `블랙리스트에 등록된 토큰 요청은 인증 실패로 거부된다`() {
-        val token = tokenGenerator.generate(1L).accessToken
+        val token = tokenGenerator.generate(1L, roles = emptySet()).accessToken
         context.getBean(AccessTokenBlacklist::class.java).blacklist(token, Duration.ofMinutes(10))
 
         restTestClient.get()
