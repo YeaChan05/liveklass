@@ -1,1 +1,3 @@
 org.yechan.member.MemberAuthOpenEndpointPolicy
+org.yechan.course.CourseOpenEndpointPolicy
+org.yechan.course.CourseAuthorizationPolicy
