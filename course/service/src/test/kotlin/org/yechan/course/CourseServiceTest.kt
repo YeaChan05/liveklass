@@ -16,7 +16,7 @@ class CourseServiceTest {
     fun `크리에이터는 강의를 등록하고 모집을 시작하고 마감한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
 
-        val created = service.createCourse(createCourseCommand(creatorId = 1L))
+        val created = service.createCourse(createCourseCommand(), 1L)
         val opened =
             service.openCourse(CourseStatusCommand(memberId = 1L, courseId = created.courseId))
         val closed =
@@ -28,13 +28,11 @@ class CourseServiceTest {
     }
 
     private fun createCourseCommand(
-        creatorId: Long,
         capacity: Int = 2,
     ) = CreateCourseCommand(
-        creatorId = creatorId,
         title = "Kotlin Basic",
         description = "Kotlin course",
-        price = Money(100_000L),
+        price = Money(1L),
         capacity = capacity,
         periodStart = LocalDateTime.of(2026, 6, 1, 0, 0),
         periodEnd = LocalDateTime.of(2026, 6, 30, 0, 0),
