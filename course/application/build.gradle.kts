@@ -9,10 +9,13 @@ dependencies {
     implementation(project(":course:repository-redis"))
     implementation(project(":course:schema"))
 
-    compileOnly("com.mysql:mysql-connector-j") {
+    runtimeOnly("com.mysql:mysql-connector-j") {
         exclude(group = "com.google.protobuf", module = "protobuf-java")
     }
 
     // spring boot dev tools
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")
+
+    // spring liquibase org.liquibase:liquibase-gradle-plugin
+    implementation("org.springframework.boot:spring-boot-starter-liquibase")
 }
