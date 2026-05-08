@@ -62,7 +62,7 @@ class CommonSecurityAutoConfigurationTest {
     fun `토큰이 없는 요청은 인증 실패로 거부된다`() {
         restTestClient.get()
             .uri("/secure")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .exchange()
             .expectStatus().isUnauthorized
     }
@@ -71,7 +71,7 @@ class CommonSecurityAutoConfigurationTest {
     fun `잘못된 토큰 요청은 인증 실패로 거부된다`() {
         restTestClient.get()
             .uri("/secure")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .header(HttpHeaders.AUTHORIZATION, "Bearer invalid")
             .exchange()
             .expectStatus().isUnauthorized
@@ -83,12 +83,46 @@ class CommonSecurityAutoConfigurationTest {
 
         restTestClient.get()
             .uri("/secure")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
             .exchange()
             .expectStatus().isOk
             .expectBody<String>()
             .isEqualTo("1")
+    }
+
+    @Test
+    fun `토큰 역할 클레임은 스프링 시큐리티 authority로 복원된다`() {
+        val token = tokenGenerator.generate(1L, roles = setOf("ADMIN")).accessToken
+
+        restTestClient.get()
+            .uri("/authority")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody<String>()
+            .isEqualTo("ROLE_ADMIN")
+    }
+
+    @Test
+    fun `모듈이 주입한 역할 정책은 토큰 authority로 판정된다`() {
+        val adminToken = tokenGenerator.generate(1L, roles = setOf("ADMIN")).accessToken
+        val userToken = tokenGenerator.generate(1L, roles = setOf("USER")).accessToken
+
+        restTestClient.get()
+            .uri("/admin")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $adminToken")
+            .exchange()
+            .expectStatus().isOk
+
+        restTestClient.get()
+            .uri("/admin")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $userToken")
+            .exchange()
+            .expectStatus().isForbidden
     }
 
     @Test
@@ -98,7 +132,7 @@ class CommonSecurityAutoConfigurationTest {
 
         restTestClient.get()
             .uri("/secure")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
             .exchange()
             .expectStatus().isUnauthorized
@@ -118,7 +152,7 @@ class CommonSecurityAutoConfigurationTest {
     fun `추가 보안 정책은 기본 차단 규칙보다 먼저 적용된다`() {
         restTestClient.get()
             .uri("/open")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .exchange()
             .expectStatus().isOk
             .expectBody<String>()
@@ -126,7 +160,7 @@ class CommonSecurityAutoConfigurationTest {
 
         restTestClient.get()
             .uri("/secure")
-            .header("X-API-Version", "v1")
+            .header(HeaderConst.API_VERSION_HEADER, "v1")
             .exchange()
             .expectStatus().isUnauthorized
     }
@@ -151,6 +185,14 @@ class CommonSecurityAutoConfigurationTest {
             @GetMapping("/secure")
             fun secure(authentication: Authentication): String = authentication.name
 
+            @GetMapping("/authority")
+            fun authority(authentication: Authentication): String = authentication.authorities
+                .mapNotNull { it.authority }
+                .joinToString(",")
+
+            @GetMapping("/admin")
+            fun admin(): String = "admin"
+
             @GetMapping("/internal/secure")
             fun internalSecure(authentication: Authentication): String = authentication.name
         }
@@ -165,7 +207,7 @@ class CommonSecurityAutoConfigurationTest {
                     .apply<DefaultMockMvcBuilder>(SecurityMockMvcConfigurers.springSecurity())
                     .build()
             return RestTestClient.bindTo(mockMvc)
-                .apiVersionInserter(ApiVersionInserter.useHeader("X-API-Version"))
+                .apiVersionInserter(ApiVersionInserter.useHeader(HeaderConst.API_VERSION_HEADER))
                 .build()
         }
 
@@ -194,6 +236,13 @@ class CommonSecurityAutoConfigurationTest {
             0,
             ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(policy),
         )
+
+        @Bean
+        fun adminEndpointCustomizer(): AuthorizeHttpRequestsCustomizer = PrioritizedAuthorizeHttpRequestsCustomizer(
+            1,
+        ) { registry ->
+            registry.requestMatchers("/admin").hasRole("ADMIN")
+        }
     }
 
     private class FakeAccessTokenBlacklist : AccessTokenBlacklist {
