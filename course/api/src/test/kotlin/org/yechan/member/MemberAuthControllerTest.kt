@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
+import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
 
 @SpringBootTest(
@@ -115,7 +117,7 @@ class MemberAuthControllerTest @Autowired constructor(
 
     @Test
     fun `로그인 리프레시 내 정보 조회는 필요한 응답을 노출한다`() {
-        val accessToken = tokenGenerator.generate(1L).accessToken
+        val accessToken = tokenGenerator.generate(1L, roles = emptySet()).accessToken
 
         restTestClient.post()
             .uri("/api/auth/login")
@@ -174,7 +176,7 @@ class MemberAuthControllerTest @Autowired constructor(
 
     @Test
     fun `로그아웃은 인증된 액세스 토큰을 전달한다`() {
-        val accessToken = tokenGenerator.generate(1L).accessToken
+        val accessToken = tokenGenerator.generate(1L, roles = emptySet()).accessToken
 
         restTestClient.post()
             .uri("/api/auth/logout")
@@ -189,7 +191,7 @@ class MemberAuthControllerTest @Autowired constructor(
     }
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration
+    @EnableAutoConfiguration(exclude = [ServiceAutoConfiguration::class])
     @Import(
         MemberAuthController::class,
         MemberAuthOpenEndpointPolicy::class,
@@ -210,6 +212,7 @@ class MemberAuthControllerTest @Autowired constructor(
         }
 
         @Bean
+        @Primary
         fun memberAuthService(): FakeMemberAuthService = FakeMemberAuthService()
     }
 
