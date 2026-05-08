@@ -23,8 +23,8 @@ class InvalidRefreshTokenException :
 
 class MemberNotFoundException :
     BusinessException(
-        Status.AUTHENTICATION_FAILED,
-        "인증이 필요합니다.",
+        Status.RESOURCE_NOT_FOUND,
+        "회원 정보를 찾을 수 없습니다.",
     )
 
 class InactiveMemberException :
