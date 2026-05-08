@@ -47,6 +47,16 @@ fun `property 값이 다르면 bean을 등록하지 않는다`() {
 }
 ```
 
+테스트 클래스명은 요청 엔드포인트 패키지를 기준으로 다음과같이 작명한다
+
+예를들어 `POST /api/enrollment`는 다음과 같은 테스트 클래스에서 통합 테스트가 이루어진다
+```kotlin
+// application 모듈 내 integrationTest
+package com.example.enrollment
+class PostSpecs {
+	...
+}
+```
 ## 코드 작성 방식
 - JUnit 5와 AssertJ를 사용한다
 - 단위 테스트 클래스는 `*Test`로 끝나야 한다
