@@ -1,0 +1,34 @@
+package org.yechan.course
+
+import org.springframework.beans.factory.BeanRegistrarDsl
+import org.springframework.boot.autoconfigure.AutoConfiguration
+import org.springframework.core.Ordered
+import org.springframework.http.HttpMethod
+import org.yechan.AuthorizeHttpRequestsCustomizer
+import org.yechan.PrioritizedAuthorizeHttpRequestsCustomizer
+import org.yechan.member.MemberRole
+
+@AutoConfiguration
+class CourseAuthorizationPolicy :
+    BeanRegistrarDsl({
+        registerBean<AuthorizeHttpRequestsCustomizer> {
+            PrioritizedAuthorizeHttpRequestsCustomizer(
+                Ordered.HIGHEST_PRECEDENCE + 100,
+            ) { registry ->
+                registry.requestMatchers(HttpMethod.POST, "/api/courses")
+                    .hasRole(MemberRole.CREATOR.name)
+                registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/open")
+                    .hasRole(MemberRole.CREATOR.name)
+                registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/close")
+                    .hasRole(MemberRole.CREATOR.name)
+                registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/enrollments")
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                registry.requestMatchers(HttpMethod.POST, "/api/enrollments/{enrollmentId}/confirm")
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                registry.requestMatchers(HttpMethod.POST, "/api/enrollments/{enrollmentId}/cancel")
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                registry.requestMatchers(HttpMethod.GET, "/api/enrollments/me")
+                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+            }
+        }
+    })
