@@ -363,7 +363,10 @@ class MemberAuthServiceTest {
     }
 
     private class FakeTokenGenerator : TokenGenerator {
-        override fun generate(memberId: Long?): AuthTokenValue = AuthTokenValue(
+        override fun generate(
+            memberId: Long?,
+            roles: Set<String>,
+        ): AuthTokenValue = AuthTokenValue(
             accessToken = "access-$memberId",
             refreshToken = "refresh-$memberId",
             expiresIn = 1800,
