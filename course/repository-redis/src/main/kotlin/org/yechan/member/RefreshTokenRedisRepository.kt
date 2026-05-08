@@ -1,12 +1,10 @@
 package org.yechan.member
 
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.stereotype.Repository
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-@Repository
 class RefreshTokenRedisRepository(
     private val redisTemplate: StringRedisTemplate,
 ) : RefreshTokenRepository {
