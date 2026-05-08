@@ -19,20 +19,25 @@ class JwtTokenGenerator(
         secretKey = Keys.hmacShaKeyFor(secret.toByteArray(StandardCharsets.UTF_8))
     }
 
-    override fun generate(memberId: Long?): AuthTokenValue {
+    override fun generate(
+        memberId: Long?,
+        roles: Set<String>,
+    ): AuthTokenValue {
         val issuedAt = Instant.now()
         val actualMemberId = requireNotNull(memberId)
-        val accessToken = createToken(actualMemberId, issuedAt, accessExpiresIn)
-        val refreshToken = createToken(actualMemberId, issuedAt, refreshExpiresIn)
+        val accessToken = createToken(actualMemberId, roles, issuedAt, accessExpiresIn)
+        val refreshToken = createToken(actualMemberId, roles, issuedAt, refreshExpiresIn)
         return AuthTokenValue(accessToken, refreshToken, accessExpiresIn)
     }
 
     private fun createToken(
         memberId: Long,
+        roles: Set<String>,
         issuedAt: Instant,
         expiresInSeconds: Long,
     ): String = Jwts.builder()
         .subject(memberId.toString())
+        .claim(ROLES_CLAIM, roles.toList())
         .issuedAt(Date.from(issuedAt))
         .expiration(Date.from(issuedAt.plusSeconds(expiresInSeconds)))
         .signWith(secretKey)
@@ -40,5 +45,6 @@ class JwtTokenGenerator(
 
     private companion object {
         const val SECRET = "member-token-secret-member-token-secret"
+        const val ROLES_CLAIM = "roles"
     }
 }

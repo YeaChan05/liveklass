@@ -6,8 +6,8 @@ import io.jsonwebtoken.security.Keys
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import java.nio.charset.StandardCharsets
-import java.util.Collections
 import javax.crypto.SecretKey
 
 class JwtTokenVerifier(
@@ -29,7 +29,11 @@ class JwtTokenVerifier(
                     .parseSignedClaims(token)
                     .payload
             val subject = claims.subject ?: throw BadCredentialsException("Invalid token subject")
-            return UsernamePasswordAuthenticationToken(subject, token, Collections.emptyList())
+            val authorities = (claims[ROLES_CLAIM] as? Collection<*>)
+                .orEmpty()
+                .mapNotNull { it as? String }
+                .map { SimpleGrantedAuthority("ROLE_$it") }
+            return UsernamePasswordAuthenticationToken(subject, token, authorities)
         } catch (e: JwtException) {
             throw BadCredentialsException("Invalid token", e)
         } catch (e: IllegalArgumentException) {
@@ -39,5 +43,6 @@ class JwtTokenVerifier(
 
     private companion object {
         const val SECRET = "member-token-secret-member-token-secret"
+        const val ROLES_CLAIM = "roles"
     }
 }
