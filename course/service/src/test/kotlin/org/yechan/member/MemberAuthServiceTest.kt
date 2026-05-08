@@ -296,7 +296,7 @@ class MemberAuthServiceTest {
     fun `현재 사용자 조회는 알 수 없는 사용자를 거부한다`() {
         assertThatThrownBy { service.getCurrentUser(404L) }
             .isInstanceOf(BusinessException::class.java)
-            .hasMessage("인증이 필요합니다.")
+            .hasMessage("회원 정보를 찾을 수 없습니다.")
     }
 
     private class FakeMemberRepository : MemberRepository {
