@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
+import org.yechan.CourseRoleHierarchyConfiguration
 import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
 import org.yechan.member.MemberRole
@@ -168,12 +169,39 @@ class CourseControllerTest @Autowired constructor(
             .expectStatus().isUnauthorized
     }
 
+    @Test
+    fun `관리자는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
+        val accessToken =
+            tokenGenerator.generate(3L, roles = setOf(MemberRole.ADMIN.name)).accessToken
+
+        restTestClient.post()
+            .uri("/api/courses")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(
+                """
+                {
+                  "title": "Kotlin Basic",
+                  "description": "Kotlin course",
+                  "price": 100000,
+                  "capacity": 2,
+                  "periodStart": "2026-06-01T00:00:00",
+                  "periodEnd": "2026-06-30T00:00:00"
+                }
+                """.trimIndent(),
+            )
+            .exchange()
+            .expectStatus().isOk
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = [ServiceAutoConfiguration::class])
     @Import(
         CourseController::class,
         CourseAuthorizationPolicy::class,
         CourseOpenEndpointPolicy::class,
+        CourseRoleHierarchyConfiguration::class,
     )
     class TestApplication
 
