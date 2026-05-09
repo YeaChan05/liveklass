@@ -11,12 +11,12 @@ class CourseRepositoryImpl(
     override fun findAll(): List<CourseModel> = courseJpaRepository.findAll().map(CourseEntity::toDomain)
 }
 
-private fun CourseEntity.toDomain(): CourseModel = CourseModel(
+private fun CourseEntity.toDomain(): CourseModel = CourseModelData(
     courseId = id,
     creatorId = creatorId,
     title = title,
     description = description,
-    price = Money(price),
+    price = Money(priceAmount),
     capacity = capacity,
     seatLeftCount = seatLeftCount,
     periodStart = periodStart,

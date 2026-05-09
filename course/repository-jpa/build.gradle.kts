@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":common:repository-jpa"))
+    implementation(project(":course:exception"))
     implementation(project(":course:infrastructure"))
 
     integrationTestImplementation("org.springframework.boot:spring-boot-data-jpa-test")

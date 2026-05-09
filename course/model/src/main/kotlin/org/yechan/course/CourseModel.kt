@@ -1,6 +1,7 @@
 package org.yechan.course
 
 import org.yechan.enrollment.EnrollmentModel
+import org.yechan.enrollment.EnrollmentModelData
 import java.time.LocalDateTime
 
 interface CourseIdentifier {
@@ -19,7 +20,29 @@ interface CourseProps {
     val status: CourseStatus
 }
 
-data class CourseModel(
+interface CourseModel :
+    CourseProps,
+    CourseIdentifier {
+    fun open(): CourseModel
+
+    fun close(): CourseModel
+
+    fun reserveSeat(): CourseModel
+
+    fun releaseSeat(): CourseModel
+
+    fun requestEnrollment(memberId: Long): EnrollmentModel = requestEnrollment(
+        memberId = memberId,
+        currentEnrollmentCount = null,
+    )
+
+    fun requestEnrollment(
+        memberId: Long,
+        currentEnrollmentCount: Int?,
+    ): EnrollmentModel
+}
+
+data class CourseModelData(
     override val courseId: Long? = null,
     override val creatorId: Long? = null,
     override val title: String,
@@ -30,8 +53,7 @@ data class CourseModel(
     override val periodStart: LocalDateTime,
     override val periodEnd: LocalDateTime,
     override val status: CourseStatus = CourseStatus.DRAFT,
-) : CourseProps,
-    CourseIdentifier {
+) : CourseModel {
     init {
         if (creatorId == null) throw CourseInvalidStateException("강의 생성자는 필수입니다.")
         validateCapacity()
@@ -39,36 +61,36 @@ data class CourseModel(
         if (!periodEnd.isAfter(periodStart)) throw CourseInvalidStateException("수강 종료일은 시작일보다 빠를 수 없습니다.")
     }
 
-    fun open(): CourseModel {
+    override fun open(): CourseModel {
         validateIsDraft()
         return copy(status = CourseStatus.OPEN)
     }
 
-    fun close(): CourseModel {
+    override fun close(): CourseModel {
         validateIsOpen()
         return copy(status = CourseStatus.CLOSED)
     }
 
-    fun reserveSeat(): CourseModel {
+    override fun reserveSeat(): CourseModel {
         validateIsOpen()
         validateHasSeat()
         return copy(seatLeftCount = seatLeftCount - 1)
     }
 
-    fun releaseSeat(): CourseModel {
+    override fun releaseSeat(): CourseModel {
         if (seatLeftCount >= capacity) throw CourseInvalidStateException("남은 좌석 수는 정원을 초과할 수 없습니다.")
         return copy(seatLeftCount = seatLeftCount + 1)
     }
 
-    fun requestEnrollment(
+    override fun requestEnrollment(
         memberId: Long,
-        currentEnrollmentCount: Int? = null,
+        currentEnrollmentCount: Int?,
     ): EnrollmentModel {
         validateIsOpen()
         if (currentEnrollmentCount != null && currentEnrollmentCount >= capacity) {
             throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
         }
-        return EnrollmentModel(
+        return EnrollmentModelData(
             courseId = courseId ?: throw CourseInvalidStateException("저장된 강의만 신청할 수 있습니다."),
             memberId = memberId,
         )

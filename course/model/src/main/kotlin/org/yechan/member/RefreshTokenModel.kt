@@ -12,13 +12,16 @@ interface RefreshTokenProps {
     val expiresAt: LocalDateTime
 }
 
-data class RefreshTokenModel(
+interface RefreshTokenModel :
+    RefreshTokenProps,
+    RefreshTokenIdentifier
+
+data class RefreshTokenModelData(
     override val refreshTokenId: Long? = null,
     override val userId: Long,
     override val tokenHash: String,
     override val expiresAt: LocalDateTime,
-) : RefreshTokenProps,
-    RefreshTokenIdentifier
+) : RefreshTokenModel
 
 fun verifyTokenExpiry(refreshToken: RefreshTokenModel) {
     if (refreshToken.expiresAt.isBefore(LocalDateTime.now())) {

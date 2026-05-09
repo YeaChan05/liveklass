@@ -98,7 +98,7 @@ class CourseModelTest {
         capacity: Int = 2,
         periodStart: LocalDateTime = LocalDateTime.of(2026, 6, 1, 0, 0),
         periodEnd: LocalDateTime = LocalDateTime.of(2026, 6, 30, 0, 0),
-    ) = CourseModel(
+    ) = CourseModelData(
         courseId = 10L,
         creatorId = 1L,
         title = "Kotlin Basic",

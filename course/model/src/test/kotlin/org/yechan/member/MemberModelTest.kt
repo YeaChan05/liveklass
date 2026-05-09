@@ -8,7 +8,7 @@ class MemberModelTest {
 
     @Test
     fun `활성 상태인 회원은 상태 검증을 통과한다`() {
-        val member = MemberModel(
+        val member = MemberModelData(
             memberId = 1L,
             email = "test@example.com",
             passwordHash = "hash",
@@ -23,7 +23,7 @@ class MemberModelTest {
 
     @Test
     fun `삭제된 상태인 회원은 상태 검증 시 예외가 발생한다`() {
-        val member = MemberModel(
+        val member = MemberModelData(
             memberId = 1L,
             email = "test@example.com",
             passwordHash = "hash",

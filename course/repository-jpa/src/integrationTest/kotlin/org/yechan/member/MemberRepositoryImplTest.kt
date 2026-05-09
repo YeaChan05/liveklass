@@ -97,7 +97,7 @@ class MemberRepositoryImplTest {
         email: String = "student@example.com",
         role: MemberRole = MemberRole.CLASSMATE,
         status: MemberStatus = MemberStatus.ACTIVE,
-    ) = MemberModel(
+    ) = MemberModelData(
         email = email,
         passwordHash = "hashed-password",
         name = "홍길동",

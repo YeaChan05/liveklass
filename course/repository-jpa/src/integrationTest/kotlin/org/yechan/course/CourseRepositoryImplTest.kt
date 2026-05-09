@@ -87,7 +87,7 @@ class CourseRepositoryImplTest {
     private fun course(
         title: String = "테스트 강의",
         creatorId: Long = 1L,
-    ) = CourseModel(
+    ) = CourseModelData(
         title = title,
         description = "테스트 설명",
         creatorId = creatorId,

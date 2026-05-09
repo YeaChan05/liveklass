@@ -11,18 +11,21 @@ import org.yechan.BaseEntity
 @Table(name = "members")
 class MemberEntity private constructor(
     @field:Column(nullable = false, unique = true, length = 255)
-    var email: String,
+    override var email: String,
     @field:Column(name = "password_hash", nullable = false)
-    var passwordHash: String,
+    override var passwordHash: String,
     @field:Column(nullable = false, length = 30)
-    var name: String,
+    override var name: String,
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
-    var role: MemberRole,
+    override var role: MemberRole,
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
-    var status: MemberStatus,
-) : BaseEntity() {
+    override var status: MemberStatus,
+) : BaseEntity(),
+    MemberModel {
+    override val memberId: Long?
+        get() = id
 
     companion object {
         fun from(member: MemberModel): MemberEntity = MemberEntity(
@@ -34,7 +37,13 @@ class MemberEntity private constructor(
         )
     }
 
-    fun toDomain(): MemberModel = MemberModel(
+    override fun validateMemberStatus() {
+        if (status != MemberStatus.ACTIVE) {
+            throw InactiveMemberException()
+        }
+    }
+
+    fun toDomain(): MemberModel = MemberModelData(
         memberId = id,
         email = email,
         passwordHash = passwordHash,

@@ -16,12 +16,12 @@ import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.TestPropertySource
 import org.yechan.course.CourseEntity
 import org.yechan.course.CourseJpaRepository
-import org.yechan.course.CourseModel
+import org.yechan.course.CourseModelData
 import org.yechan.course.CourseStatus
 import org.yechan.course.Money
 import org.yechan.member.MemberEntity
 import org.yechan.member.MemberJpaRepository
-import org.yechan.member.MemberModel
+import org.yechan.member.MemberModelData
 import org.yechan.member.MemberRole
 import java.time.LocalDateTime
 
@@ -62,7 +62,7 @@ class EnrollmentRepositoryImplTest {
         val course = persistCourse(creator)
 
         val saved = enrollmentRepository.save(
-            EnrollmentModel(
+            EnrollmentModelData(
                 courseId = course.id!!,
                 memberId = member.id!!,
                 status = EnrollmentStatus.PENDING,
@@ -82,7 +82,7 @@ class EnrollmentRepositoryImplTest {
         val member = persistMember(email = "student@example.com")
         val course = persistCourse(creator)
         val saved = enrollmentRepository.save(
-            EnrollmentModel(
+            EnrollmentModelData(
                 courseId = course.id!!,
                 memberId = member.id!!,
                 status = EnrollmentStatus.CONFIRMED,
@@ -107,11 +107,11 @@ class EnrollmentRepositoryImplTest {
         val otherMember = persistMember(email = "other@example.com")
         val course = persistCourse(creator)
         val memberEnrollment = enrollmentRepository.save(
-            EnrollmentModel(courseId = course.id!!, memberId = member.id!!),
+            EnrollmentModelData(courseId = course.id!!, memberId = member.id!!),
             courseId = course.id!!,
         )
         enrollmentRepository.save(
-            EnrollmentModel(courseId = course.id!!, memberId = otherMember.id!!),
+            EnrollmentModelData(courseId = course.id!!, memberId = otherMember.id!!),
             courseId = course.id!!,
         )
 
@@ -125,7 +125,7 @@ class EnrollmentRepositoryImplTest {
         role: MemberRole = MemberRole.CLASSMATE,
     ): MemberEntity {
         val member = MemberEntity.from(
-            MemberModel(
+            MemberModelData(
                 email = email,
                 passwordHash = "hashed-password",
                 name = email.substringBefore("@"),
@@ -139,7 +139,7 @@ class EnrollmentRepositoryImplTest {
 
     private fun persistCourse(creator: MemberEntity): CourseEntity {
         val course = CourseEntity.from(
-            CourseModel(
+            CourseModelData(
                 creatorId = creator.id,
                 title = "Kotlin Basic",
                 description = "Kotlin course",

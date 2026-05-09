@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 class MemberEntityTest {
     @Test
     fun `회원 모델로 엔티티를 생성한다`() {
-        val member = MemberModel(
+        val member = MemberModelData(
             memberId = 1L,
             email = "student@example.com",
             passwordHash = "hashed-password",
@@ -27,7 +27,7 @@ class MemberEntityTest {
     @Test
     fun `엔티티로 회원 모델을 생성한다`() {
         val entity = MemberEntity.from(
-            MemberModel(
+            MemberModelData(
                 email = "creator@example.com",
                 passwordHash = "hashed-password",
                 name = "김크리에이터",

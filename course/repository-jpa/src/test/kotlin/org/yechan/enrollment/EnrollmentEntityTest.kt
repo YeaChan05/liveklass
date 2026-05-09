@@ -3,7 +3,7 @@ package org.yechan.enrollment
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.yechan.course.CourseEntity
-import org.yechan.course.CourseModel
+import org.yechan.course.CourseModelData
 import org.yechan.course.CourseStatus
 import org.yechan.course.Money
 import java.time.LocalDateTime
@@ -12,7 +12,7 @@ class EnrollmentEntityTest {
     @Test
     fun `수강 신청 모델로 엔티티를 생성한다`() {
         val course = courseEntity(courseId = 10L)
-        val enrollment = EnrollmentModel(
+        val enrollment = EnrollmentModelData(
             enrollmentId = 30L,
             courseId = 10L,
             memberId = 20L,
@@ -29,7 +29,7 @@ class EnrollmentEntityTest {
     @Test
     fun `엔티티로 수강 신청 모델을 생성한다`() {
         val entity = EnrollmentEntity.from(
-            EnrollmentModel(
+            EnrollmentModelData(
                 enrollmentId = 30L,
                 courseId = 10L,
                 memberId = 20L,
@@ -46,7 +46,7 @@ class EnrollmentEntityTest {
     }
 
     private fun courseEntity(courseId: Long): CourseEntity = CourseEntity.from(
-        CourseModel(
+        CourseModelData(
             courseId = courseId,
             creatorId = 1L,
             title = "Kotlin Basic",

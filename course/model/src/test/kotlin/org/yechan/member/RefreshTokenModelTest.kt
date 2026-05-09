@@ -9,7 +9,7 @@ class RefreshTokenModelTest {
 
     @Test
     fun `만료된 토큰 검증 시 예외가 발생한다`() {
-        val expiredToken = RefreshTokenModel(
+        val expiredToken = RefreshTokenModelData(
             userId = 1L,
             tokenHash = "hash",
             expiresAt = LocalDateTime.now().minusSeconds(1),
@@ -21,7 +21,7 @@ class RefreshTokenModelTest {
 
     @Test
     fun `만료되지 않은 토큰 검증 시 예외가 발생하지 않는다`() {
-        val validToken = RefreshTokenModel(
+        val validToken = RefreshTokenModelData(
             userId = 1L,
             tokenHash = "hash",
             expiresAt = LocalDateTime.now().plusHours(1),
@@ -33,7 +33,7 @@ class RefreshTokenModelTest {
 
     @Test
     fun `사용자 ID가 일치하지 않으면 예외가 발생한다`() {
-        val token = RefreshTokenModel(
+        val token = RefreshTokenModelData(
             userId = 1L,
             tokenHash = "hash",
             expiresAt = LocalDateTime.now().plusHours(1),
@@ -45,7 +45,7 @@ class RefreshTokenModelTest {
 
     @Test
     fun `사용자 ID가 일치하면 예외가 발생하지 않는다`() {
-        val token = RefreshTokenModel(
+        val token = RefreshTokenModelData(
             userId = 1L,
             tokenHash = "hash",
             expiresAt = LocalDateTime.now().plusHours(1),

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.yechan.enrollment.EnrollmentModel
+import org.yechan.enrollment.EnrollmentModelData
 import org.yechan.enrollment.EnrollmentStatus
 
 class EnrollmentModelTest {
@@ -63,7 +64,7 @@ class EnrollmentModelTest {
         assertEquals("이미 취소된 신청입니다.", exception.message)
     }
 
-    private fun enrollment() = EnrollmentModel(
+    private fun enrollment() = EnrollmentModelData(
         enrollmentId = 20L,
         courseId = 10L,
         memberId = 1L,

@@ -12,16 +12,21 @@ interface MemberProps {
     val status: MemberStatus
 }
 
-data class MemberModel(
+interface MemberModel :
+    MemberProps,
+    MemberIdentifier {
+    fun validateMemberStatus()
+}
+
+data class MemberModelData(
     override val memberId: Long? = null,
     override val email: String,
     override val passwordHash: String,
     override val name: String,
     override val role: MemberRole,
     override val status: MemberStatus = MemberStatus.ACTIVE,
-) : MemberProps,
-    MemberIdentifier {
-    fun validateMemberStatus() {
+) : MemberModel {
+    override fun validateMemberStatus() {
         if (status != MemberStatus.ACTIVE) {
             throw InactiveMemberException()
         }
