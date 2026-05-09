@@ -1,11 +1,12 @@
-package org.yechan.auth
+package org.yechan.member
 
 import org.springframework.beans.factory.BeanRegistrarDsl
 import org.springframework.boot.autoconfigure.AutoConfiguration
+import org.springframework.context.annotation.Import
 import org.yechan.AccessTokenBlacklist
-import org.yechan.member.AccessTokenBlacklistRepository
 import java.time.Duration
 
+@Import(MemberSecurityAdapterBeanRegistrar::class)
 @AutoConfiguration
 class MemberSecurityAdapterConfiguration
 class MemberSecurityAdapterBeanRegistrar :
