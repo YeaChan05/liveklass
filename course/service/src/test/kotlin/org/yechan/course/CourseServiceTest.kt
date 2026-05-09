@@ -3,6 +3,7 @@ package org.yechan.course
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.yechan.member.MemberModel
+import org.yechan.member.MemberModelData
 import org.yechan.member.MemberRepository
 import org.yechan.member.MemberRole
 import java.time.LocalDateTime
@@ -41,7 +42,7 @@ class CourseServiceTest {
     private fun member(
         id: Long,
         role: MemberRole,
-    ) = MemberModel(
+    ) = MemberModelData(
         memberId = id,
         email = "user$id@example.com",
         passwordHash = "hash",
@@ -70,7 +71,22 @@ private class FakeCourseRepository : CourseRepository {
     private var nextId = 1L
 
     override fun save(course: CourseModel): CourseModel {
-        val saved = if (course.courseId == null) course.copy(courseId = nextId++) else course
+        val saved = if (course.courseId == null) {
+            CourseModelData(
+                courseId = nextId++,
+                creatorId = course.creatorId,
+                title = course.title,
+                description = course.description,
+                price = course.price,
+                capacity = course.capacity,
+                seatLeftCount = course.seatLeftCount,
+                periodStart = course.periodStart,
+                periodEnd = course.periodEnd,
+                status = course.status,
+            )
+        } else {
+            course
+        }
         courses[requireNotNull(saved.courseId)] = saved
         return saved
     }
