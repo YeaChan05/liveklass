@@ -21,7 +21,7 @@ class CourseAccessDeniedException :
         "강의를 변경할 권한이 없습니다.",
     )
 
-경class CourseInvalidStateException(
+class CourseInvalidStateException(
     message: String,
 ) : BusinessException(
     Status.BAD_REQUEST,
