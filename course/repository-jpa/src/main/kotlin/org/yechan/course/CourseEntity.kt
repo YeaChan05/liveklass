@@ -16,23 +16,32 @@ import java.time.LocalDateTime
 class CourseEntity private constructor(
     @field:Column(nullable = false)
     override var creatorId: Long,
+
     @field:Column(nullable = false, length = 100)
     override var title: String,
+
     @field:Column(nullable = false, columnDefinition = "TEXT")
     override var description: String,
+
     @field:Column(name = "price", nullable = false, precision = 19, scale = 2)
     var priceAmount: BigDecimal,
+
     @field:Column(nullable = false)
     override var capacity: Int,
+
     @field:Column(name = "seat_left_count", nullable = false)
     override var seatLeftCount: Int,
+
     @field:Column(name = "period_start", nullable = false)
     override var periodStart: LocalDateTime,
+
     @field:Column(name = "period_end", nullable = false)
     override var periodEnd: LocalDateTime,
+
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
     override var status: CourseStatus,
+
 ) : BaseEntity(),
     CourseModel {
     override val courseId: Long?

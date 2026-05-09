@@ -138,7 +138,7 @@ class EnrollmentRepositoryImplTest {
     }
 
     private fun persistCourse(creator: MemberEntity): CourseEntity {
-        val course = CourseEntity.from(
+        val course = CourseEntity.of(
             CourseModelData(
                 creatorId = creator.id,
                 title = "Kotlin Basic",

@@ -13,11 +13,14 @@ import org.yechan.course.CourseInvalidStateException
 class EnrollmentEntity private constructor(
     @field:Column(nullable = false)
     override var courseId: Long,
+
     @field:Column(nullable = false)
     override var memberId: Long,
+
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
     override var status: EnrollmentStatus,
+
 ) : BaseEntity(),
     EnrollmentModel {
     override val enrollmentId: Long?
