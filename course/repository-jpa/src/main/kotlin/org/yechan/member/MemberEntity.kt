@@ -41,12 +41,6 @@ class MemberEntity private constructor(
         )
     }
 
-    override fun validateMemberStatus() {
-        if (status != MemberStatus.ACTIVE) {
-            throw InactiveMemberException()
-        }
-    }
-
     fun toDomain(): MemberModel = MemberModelData(
         memberId = id,
         email = email,

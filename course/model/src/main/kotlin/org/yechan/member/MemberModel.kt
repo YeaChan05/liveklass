@@ -15,7 +15,12 @@ interface MemberProps {
 interface MemberModel :
     MemberProps,
     MemberIdentifier {
-    fun validateMemberStatus()
+    fun validateMemberStatus() {
+        if (status != MemberStatus.ACTIVE) {
+            throw InactiveMemberException()
+        }
+    }
+    fun canManageCourse(): Boolean = role == MemberRole.CREATOR
 }
 
 data class MemberModelData(
@@ -25,18 +30,11 @@ data class MemberModelData(
     override val name: String,
     override val role: MemberRole,
     override val status: MemberStatus = MemberStatus.ACTIVE,
-) : MemberModel {
-    override fun validateMemberStatus() {
-        if (status != MemberStatus.ACTIVE) {
-            throw InactiveMemberException()
-        }
-    }
-}
+) : MemberModel
 
 enum class MemberRole {
     CREATOR,
     CLASSMATE,
-    ADMIN,
 }
 
 enum class MemberStatus {
