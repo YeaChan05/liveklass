@@ -50,4 +50,3 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
         assertThat(repository.pop(1L)?.memberId).isEqualTo(20L)
     }
 }
-
