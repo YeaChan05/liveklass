@@ -20,7 +20,6 @@ interface MemberModel :
             throw InactiveMemberException()
         }
     }
-    fun canManageCourse(): Boolean = role == MemberRole.CREATOR
 }
 
 data class MemberModelData(
