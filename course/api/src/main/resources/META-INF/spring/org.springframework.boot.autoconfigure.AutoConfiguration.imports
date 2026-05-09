@@ -1,7 +1,5 @@
 org.yechan.auth.CourseJwtAutoConfiguration
 org.yechan.auth.CourseJwtBeanRegistrar
-org.yechan.auth.MemberSecurityAdapterConfiguration
-org.yechan.auth.MemberSecurityAdapterBeanRegistrar
 org.yechan.member.MemberAuthOpenEndpointPolicy
 org.yechan.course.CourseOpenEndpointPolicy
 org.yechan.course.CourseAuthorizationPolicy
