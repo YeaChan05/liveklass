@@ -1,6 +1,6 @@
 package org.yechan
 
-interface TokenGenerator {
+fun interface TokenGenerator {
     fun generate(
         memberId: Long?,
         roles: Set<String>,

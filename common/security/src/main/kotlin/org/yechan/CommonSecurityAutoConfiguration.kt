@@ -36,8 +36,8 @@ class CommonSecurityBeanRegistrar :
 
         registerBean<JwtAuthenticationFilter> {
             JwtAuthenticationFilter(
-                bean(),
-                bean(),
+                beanProvider<TokenParser>().ifAvailable ?: NoOpTokenParser,
+                beanProvider<TokenVerifier>().ifAvailable ?: NoOpTokenVerifier,
                 beanProvider<AccessTokenBlacklist>().ifAvailable ?: NoOpAccessTokenBlacklist,
                 bean(),
             )
