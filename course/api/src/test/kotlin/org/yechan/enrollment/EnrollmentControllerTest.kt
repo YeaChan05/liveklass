@@ -20,10 +20,10 @@ import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
 import org.yechan.ServiceBeanRegistrar
 import org.yechan.TokenGenerator
-import org.yechan.auth.MemberSecurityAdapterBeanRegistrar
-import org.yechan.auth.MemberSecurityAdapterConfiguration
 import org.yechan.course.CourseAuthorizationPolicy
 import org.yechan.member.MemberRole
+import org.yechan.member.MemberSecurityAdapterBeanRegistrar
+import org.yechan.member.MemberSecurityAdapterConfiguration
 
 @SpringBootTest(
     classes = [
