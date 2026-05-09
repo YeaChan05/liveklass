@@ -1,4 +1,4 @@
-package org.yechan
+package org.yechan.auth
 
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
@@ -6,8 +6,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
-import org.yechan.auth.JwtTokenExpirationResolver
-import org.yechan.auth.JwtTokenGenerator
+import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -85,7 +84,7 @@ class JwtTokenExpirationResolverTest {
         // Arrange
         val tokenWithoutExpiration = Jwts.builder()
             .subject("1")
-            .signWith(Keys.hmacShaKeyFor(("member-token-secret-member-token-secret$salt").toByteArray(java.nio.charset.StandardCharsets.UTF_8)))
+            .signWith(Keys.hmacShaKeyFor(("member-token-secret-member-token-secret$salt").toByteArray(StandardCharsets.UTF_8)))
             .compact()
         val resolver = JwtTokenExpirationResolver(salt)
 
