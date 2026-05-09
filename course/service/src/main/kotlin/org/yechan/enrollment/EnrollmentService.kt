@@ -84,7 +84,7 @@ class EnrollmentService(
 
     private fun activeMember(memberId: Long): MemberModel {
         val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
-        member.validateMemberStatus()
+        member.isActive()
         return member
     }
 

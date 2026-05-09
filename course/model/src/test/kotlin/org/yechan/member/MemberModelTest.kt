@@ -17,7 +17,7 @@ class MemberModelTest {
             status = MemberStatus.ACTIVE,
         )
 
-        assertThatCode { member.validateMemberStatus() }
+        assertThatCode { member.isActive() }
             .doesNotThrowAnyException()
     }
 
@@ -32,7 +32,7 @@ class MemberModelTest {
             status = MemberStatus.DELETED,
         )
 
-        assertThatThrownBy { member.validateMemberStatus() }
+        assertThatThrownBy { member.isActive() }
             .isInstanceOf(InactiveMemberException::class.java)
     }
 }
