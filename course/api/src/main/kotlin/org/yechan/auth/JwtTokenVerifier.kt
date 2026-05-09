@@ -1,4 +1,4 @@
-package org.yechan
+package org.yechan.auth
 
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
@@ -7,6 +7,7 @@ import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.yechan.TokenVerifier
 import java.nio.charset.StandardCharsets
 import javax.crypto.SecretKey
 

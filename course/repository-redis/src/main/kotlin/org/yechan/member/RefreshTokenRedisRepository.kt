@@ -94,7 +94,7 @@ private data class RefreshTokenRedisValue(
     fun serialize(): String = listOf(userId.toString(), expiresAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
         .joinToString(SEPARATOR)
 
-    fun toDomain(tokenHash: String): RefreshTokenModel = RefreshTokenModel(
+    fun toDomain(tokenHash: String): RefreshTokenModel = RefreshTokenModelData(
         userId = userId,
         tokenHash = tokenHash,
         expiresAt = expiresAt,

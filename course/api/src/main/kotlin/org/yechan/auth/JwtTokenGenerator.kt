@@ -1,7 +1,9 @@
-package org.yechan
+package org.yechan.auth
 
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import org.yechan.AuthTokenValue
+import org.yechan.TokenGenerator
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.Date

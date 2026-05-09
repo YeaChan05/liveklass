@@ -22,13 +22,13 @@ class CourseAuthorizationPolicy :
                 registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/close")
                     .hasAnyRole(MemberRole.CREATOR.name, MemberRole.ADMIN.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/courses/{courseId}/enrollments")
-                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                    .hasRole(MemberRole.CLASSMATE.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/enrollments/{enrollmentId}/confirm")
-                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                    .hasRole(MemberRole.CLASSMATE.name)
                 registry.requestMatchers(HttpMethod.POST, "/api/enrollments/{enrollmentId}/cancel")
-                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                    .hasRole(MemberRole.CLASSMATE.name)
                 registry.requestMatchers(HttpMethod.GET, "/api/enrollments/me")
-                    .hasAnyRole(MemberRole.CREATOR.name, MemberRole.CLASSMATE.name)
+                    .hasRole(MemberRole.CLASSMATE.name)
             }
         }
     })

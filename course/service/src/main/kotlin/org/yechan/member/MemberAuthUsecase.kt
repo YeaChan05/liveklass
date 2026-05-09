@@ -43,7 +43,7 @@ class MemberAuthService(
 
         val member =
             memberRepository.save(
-                MemberModel(
+                MemberModelData(
                     email = email,
                     passwordHash = passwordHashEncoder.encode(command.password),
                     name = command.name.trim(),
@@ -72,7 +72,7 @@ class MemberAuthService(
         val memberId = requireNotNull(member.memberId)
         val token = tokenGenerator.generate(memberId, roles = setOf(member.role.name))
         refreshTokenRepository.replace(
-            RefreshTokenModel(
+            RefreshTokenModelData(
                 userId = memberId,
                 tokenHash = token.refreshToken.toRefreshTokenHash(),
                 expiresAt = LocalDateTime.now().plusSeconds(authTokenProperties.refreshExpiresIn),

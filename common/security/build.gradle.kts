@@ -2,8 +2,9 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-security")
     implementation(project(":common:api"))
     implementation(project(":common:exception"))
+    testImplementation(project(":course:api"))
     testImplementation("org.springframework.security:spring-security-test")
-    implementation(rootProject.libs.jjwt.api)
-    implementation(rootProject.libs.jjwt.impl)
-    implementation(rootProject.libs.jjwt.jackson)
+    testImplementation(rootProject.libs.jjwt.api)
+    testImplementation(rootProject.libs.jjwt.impl)
+    testImplementation(rootProject.libs.jjwt.jackson)
 }

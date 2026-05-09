@@ -1,16 +1,16 @@
 package org.yechan.course
 
-import org.junit.jupiter.api.Test
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
-import org.springframework.context.ApplicationContext
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy
@@ -24,7 +24,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
+import org.yechan.ServiceBeanRegistrar
 import org.yechan.TokenGenerator
+import org.yechan.auth.MemberSecurityAdapterBeanRegistrar
+import org.yechan.auth.MemberSecurityAdapterConfiguration
 import org.yechan.member.MemberRole
 import java.time.LocalDateTime
 
@@ -225,7 +228,14 @@ class CourseControllerTest @Autowired constructor(
     }
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration(exclude = [ServiceAutoConfiguration::class])
+    @EnableAutoConfiguration(
+        exclude = [
+            ServiceAutoConfiguration::class,
+            ServiceBeanRegistrar::class,
+            MemberSecurityAdapterConfiguration::class,
+            MemberSecurityAdapterBeanRegistrar::class,
+        ],
+    )
     @Import(
         CourseController::class,
         CourseAuthorizationPolicy::class,
@@ -260,8 +270,11 @@ class CourseControllerTest @Autowired constructor(
 
         override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
             CourseStatus.OPEN -> listOf(course(status = CourseStatus.OPEN, seatLeftCount = 1))
+
             CourseStatus.CLOSED -> listOf(course(status = CourseStatus.CLOSED, seatLeftCount = 1))
+
             CourseStatus.DRAFT -> listOf(course(status = CourseStatus.DRAFT))
+
             null -> listOf(
                 course(status = CourseStatus.OPEN, seatLeftCount = 1),
                 course(status = CourseStatus.CLOSED, seatLeftCount = 1),

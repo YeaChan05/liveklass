@@ -65,7 +65,7 @@ class RefreshTokenRedisRepositoryTest : RedisIntegrationTest() {
         userId: Long,
         tokenHash: String,
         expiresAt: LocalDateTime = LocalDateTime.now().plusMinutes(10),
-    ) = RefreshTokenModel(
+    ) = RefreshTokenModelData(
         userId = userId,
         tokenHash = tokenHash,
         expiresAt = expiresAt,

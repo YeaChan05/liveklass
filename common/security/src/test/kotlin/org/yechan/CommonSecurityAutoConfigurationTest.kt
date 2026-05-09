@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.security.core.Authentication
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
@@ -25,6 +26,14 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
+import org.yechan.auth.CourseJwtAutoConfiguration
+import org.yechan.auth.CourseJwtBeanRegistrar
+import org.yechan.auth.MemberSecurityAdapterBeanRegistrar
+import org.yechan.auth.MemberSecurityAdapterConfiguration
+import org.yechan.course.CourseAuthorizationPolicy
+import org.yechan.course.CourseOpenEndpointPolicy
+import org.yechan.course.CourseRoleHierarchyConfiguration
+import org.yechan.member.MemberAuthOpenEndpointPolicy
 import java.time.Duration
 
 @SpringBootTest(
@@ -185,7 +194,27 @@ class CommonSecurityAutoConfigurationTest {
     }
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration
+    @EnableAutoConfiguration(
+        exclude = [
+            CourseJwtAutoConfiguration::class,
+            CourseJwtBeanRegistrar::class,
+            MemberSecurityAdapterConfiguration::class,
+            MemberSecurityAdapterBeanRegistrar::class,
+            MemberAuthOpenEndpointPolicy::class,
+            CourseOpenEndpointPolicy::class,
+            CourseAuthorizationPolicy::class,
+            CourseRoleHierarchyConfiguration::class,
+        ],
+        excludeName = [
+            "org.yechan.ServiceAutoConfiguration",
+            "org.yechan.ServiceBeanRegistrar",
+        ],
+
+    )
+    @Import(
+        CourseJwtAutoConfiguration::class,
+        CourseJwtBeanRegistrar::class,
+    )
     class TestApplication {
         @RestController
         @RequestMapping(version = "v1")
@@ -232,6 +261,7 @@ class CommonSecurityAutoConfigurationTest {
         }
 
         @Bean
+        @org.springframework.context.annotation.Primary
         fun accessTokenBlacklist(): AccessTokenBlacklist = FakeAccessTokenBlacklist()
 
         @Bean

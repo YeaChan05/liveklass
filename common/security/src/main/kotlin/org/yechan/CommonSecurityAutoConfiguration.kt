@@ -2,7 +2,6 @@ package org.yechan
 
 import org.springframework.beans.factory.BeanRegistrarDsl
 import org.springframework.boot.autoconfigure.AutoConfiguration
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -17,9 +16,6 @@ import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
-@EnableConfigurationProperties(
-    AuthTokenProperties::class,
-)
 class CommonSecurityAutoConfiguration
 
 @AutoConfiguration(
@@ -30,28 +26,6 @@ class CommonSecurityAutoConfiguration
 )
 class CommonSecurityBeanRegistrar :
     BeanRegistrarDsl({
-        registerBean<TokenGenerator> {
-            val authTokenProperties = bean<AuthTokenProperties>()
-
-            JwtTokenGenerator(
-                authTokenProperties.salt,
-                authTokenProperties.accessExpiresIn,
-                authTokenProperties.refreshExpiresIn,
-            )
-        }
-
-        registerBean<TokenParser> {
-            JwtTokenParser()
-        }
-
-        registerBean<TokenVerifier> {
-            JwtTokenVerifier(bean<AuthTokenProperties>().salt)
-        }
-
-        registerBean<TokenExpirationResolver> {
-            JwtTokenExpirationResolver(bean<AuthTokenProperties>().salt)
-        }
-
         registerBean<AuthenticationEntryPoint> {
             DefaultAuthenticationEntryPoint()
         }

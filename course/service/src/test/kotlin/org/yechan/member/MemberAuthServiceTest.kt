@@ -304,7 +304,14 @@ class MemberAuthServiceTest {
         private var nextId = 1L
 
         override fun save(member: MemberModel): MemberModel {
-            val saved = member.copy(memberId = member.memberId ?: nextId++)
+            val saved = MemberModelData(
+                memberId = member.memberId ?: nextId++,
+                email = member.email,
+                passwordHash = member.passwordHash,
+                name = member.name,
+                role = member.role,
+                status = member.status,
+            )
             members[saved.memberId!!] = saved
             return saved
         }
@@ -319,7 +326,15 @@ class MemberAuthServiceTest {
             id: Long,
             status: MemberStatus,
         ) {
-            members[id] = members.getValue(id).copy(status = status)
+            val current = members.getValue(id)
+            members[id] = MemberModelData(
+                memberId = current.memberId,
+                email = current.email,
+                passwordHash = current.passwordHash,
+                name = current.name,
+                role = current.role,
+                status = status,
+            )
         }
 
         fun delete(id: Long) {
@@ -352,7 +367,12 @@ class MemberAuthServiceTest {
         ) {
             val token = tokens.first { it.userId == sourceUserId }
             tokens.remove(token)
-            tokens += token.copy(userId = userId, expiresAt = expiresAt)
+            tokens += RefreshTokenModelData(
+                refreshTokenId = token.refreshTokenId,
+                userId = userId,
+                tokenHash = token.tokenHash,
+                expiresAt = expiresAt,
+            )
         }
     }
 

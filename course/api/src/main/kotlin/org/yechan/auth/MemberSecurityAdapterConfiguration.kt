@@ -1,12 +1,14 @@
-package org.yechan.member
+package org.yechan.auth
 
 import org.springframework.beans.factory.BeanRegistrarDsl
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.yechan.AccessTokenBlacklist
+import org.yechan.member.AccessTokenBlacklistRepository
 import java.time.Duration
 
 @AutoConfiguration
-class MemberSecurityAdapterConfiguration :
+class MemberSecurityAdapterConfiguration
+class MemberSecurityAdapterBeanRegistrar :
     BeanRegistrarDsl({
         registerBean<AccessTokenBlacklist> {
             AccessTokenBlacklistAdapter(bean())
@@ -14,14 +16,14 @@ class MemberSecurityAdapterConfiguration :
     })
 
 private class AccessTokenBlacklistAdapter(
-    private val accessTokenBlacklistRedisRepository: AccessTokenBlacklistRedisRepository,
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
 ) : AccessTokenBlacklist {
     override fun blacklist(
         token: String,
         ttl: Duration,
     ) {
-        accessTokenBlacklistRedisRepository.blacklist(token, ttl)
+        accessTokenBlacklistRepository.blacklist(token, ttl)
     }
 
-    override fun contains(token: String): Boolean = accessTokenBlacklistRedisRepository.contains(token)
+    override fun contains(token: String): Boolean = accessTokenBlacklistRepository.contains(token)
 }

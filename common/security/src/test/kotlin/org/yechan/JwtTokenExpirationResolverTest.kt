@@ -6,6 +6,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
+import org.yechan.auth.JwtTokenExpirationResolver
+import org.yechan.auth.JwtTokenGenerator
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant

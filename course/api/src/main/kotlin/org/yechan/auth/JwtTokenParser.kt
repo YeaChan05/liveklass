@@ -1,8 +1,9 @@
-package org.yechan
+package org.yechan.auth
 
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpHeaders
 import org.springframework.util.StringUtils
+import org.yechan.TokenParser
 
 class JwtTokenParser : TokenParser {
     override fun parse(request: HttpServletRequest): String? {

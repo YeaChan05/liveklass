@@ -19,7 +19,7 @@ class RefreshTokenRedisAutoConfigurationTest {
 
     @Test
     fun `자동 설정은 리프레시 토큰 저장소 빈을 등록한다`() {
-        val refreshToken = RefreshTokenModel(
+        val refreshToken = RefreshTokenModelData(
             userId = 1L,
             tokenHash = "token-hash",
             expiresAt = LocalDateTime.now().plusMinutes(10),
