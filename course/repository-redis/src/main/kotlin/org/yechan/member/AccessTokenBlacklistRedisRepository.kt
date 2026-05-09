@@ -1,11 +1,9 @@
 package org.yechan.member
 
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.stereotype.Repository
 import java.security.MessageDigest
 import java.time.Duration
 
-@Repository
 class AccessTokenBlacklistRedisRepository(
     private val redisTemplate: StringRedisTemplate,
 ) {

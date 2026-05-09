@@ -1,9 +1,7 @@
 package org.yechan.member
 
-import org.springframework.stereotype.Repository
 import java.time.Duration
 
-@Repository
 class AccessTokenBlacklistRepositoryImpl(
     private val accessTokenBlacklistRedisRepository: AccessTokenBlacklistRedisRepository,
 ) : AccessTokenBlacklistRepository {
