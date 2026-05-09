@@ -1,7 +1,6 @@
 package org.yechan
 
 import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
@@ -12,13 +11,18 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.client.RestTestClient
 import org.springframework.test.web.servlet.client.expectBody
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.bind.annotation.GetMapping
@@ -26,15 +30,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
-import org.yechan.auth.CourseJwtAutoConfiguration
-import org.yechan.auth.CourseJwtBeanRegistrar
-import org.yechan.auth.MemberSecurityAdapterBeanRegistrar
-import org.yechan.auth.MemberSecurityAdapterConfiguration
-import org.yechan.course.CourseAuthorizationPolicy
-import org.yechan.course.CourseOpenEndpointPolicy
-import org.yechan.course.CourseRoleHierarchyConfiguration
-import org.yechan.member.MemberAuthOpenEndpointPolicy
 import java.time.Duration
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication as securityAuthentication
 
 @SpringBootTest(
     classes = [
@@ -58,14 +55,10 @@ class CommonSecurityAutoConfigurationTest {
     lateinit var rawRestTestClient: RestTestClient
 
     @Autowired
-    lateinit var tokenGenerator: TokenGenerator
+    lateinit var mockMvc: MockMvc
 
     @Autowired
     lateinit var context: ApplicationContext
-
-    @BeforeEach
-    fun setUp() {
-    }
 
     @Test
     fun `토큰 생성기는 역할 없는 생성 메서드를 노출하지 않는다`() {
@@ -99,56 +92,49 @@ class CommonSecurityAutoConfigurationTest {
 
     @Test
     fun `올바른 토큰 요청은 허용된다`() {
-        val token = tokenGenerator.generate(1L, roles = emptySet()).accessToken
-
-        restTestClient.get()
-            .uri("/secure")
-            .header(HeaderConst.API_VERSION_HEADER, "v1")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
-            .exchange()
-            .expectStatus().isOk
-            .expectBody<String>()
-            .isEqualTo("1")
+        mockMvc.perform(
+            get("/secure")
+                .header(HeaderConst.API_VERSION_HEADER, "v1")
+                .with(securityAuthentication(testAuthentication(1L, emptySet()))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(content().string("1"))
     }
 
     @Test
     fun `토큰 역할 클레임은 스프링 시큐리티 authority로 복원된다`() {
-        val token = tokenGenerator.generate(1L, roles = setOf("ADMIN")).accessToken
-
-        restTestClient.get()
-            .uri("/authority")
-            .header(HeaderConst.API_VERSION_HEADER, "v1")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
-            .exchange()
-            .expectStatus().isOk
-            .expectBody<String>()
-            .isEqualTo("ROLE_ADMIN")
+        mockMvc.perform(
+            get("/authority")
+                .header(HeaderConst.API_VERSION_HEADER, "v1")
+                .with(securityAuthentication(testAuthentication(1L, setOf("ADMIN")))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(content().string("ROLE_ADMIN"))
     }
 
     @Test
     fun `모듈이 주입한 역할 정책은 토큰 authority로 판정된다`() {
-        val adminToken = tokenGenerator.generate(1L, roles = setOf("ADMIN")).accessToken
-        val userToken = tokenGenerator.generate(1L, roles = setOf("USER")).accessToken
+        mockMvc.perform(
+            get("/admin")
+                .header(HeaderConst.API_VERSION_HEADER, "v1")
+                .with(securityAuthentication(testAuthentication(1L, setOf("ADMIN")))),
+        )
+            .andExpect(status().isOk)
 
-        restTestClient.get()
-            .uri("/admin")
-            .header(HeaderConst.API_VERSION_HEADER, "v1")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $adminToken")
-            .exchange()
-            .expectStatus().isOk
-
-        restTestClient.get()
-            .uri("/admin")
-            .header(HeaderConst.API_VERSION_HEADER, "v1")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $userToken")
-            .exchange()
-            .expectStatus().isForbidden
+        mockMvc.perform(
+            get("/admin")
+                .header(HeaderConst.API_VERSION_HEADER, "v1")
+                .with(securityAuthentication(testAuthentication(1L, setOf("USER")))),
+        )
+            .andExpect(status().isForbidden)
     }
 
     @Test
     fun `블랙리스트에 등록된 토큰 요청은 인증 실패로 거부된다`() {
-        val token = tokenGenerator.generate(1L, roles = emptySet()).accessToken
-        context.getBean(AccessTokenBlacklist::class.java).blacklist(token, Duration.ofMinutes(10))
+        val token = "blocked-token"
+
+        context.getBean(AccessTokenBlacklist::class.java)
+            .blacklist(token, Duration.ofMinutes(10))
 
         restTestClient.get()
             .uri("/secure")
@@ -193,27 +179,22 @@ class CommonSecurityAutoConfigurationTest {
             .expectStatus().isBadRequest
     }
 
+    private fun testAuthentication(
+        memberId: Long,
+        roles: Set<String>,
+    ): Authentication = UsernamePasswordAuthenticationToken(
+        memberId.toString(),
+        null,
+        roles.map { SimpleGrantedAuthority("ROLE_$it") },
+    )
+
     @SpringBootConfiguration
     @EnableAutoConfiguration(
-        exclude = [
-            CourseJwtAutoConfiguration::class,
-            CourseJwtBeanRegistrar::class,
-            MemberSecurityAdapterConfiguration::class,
-            MemberSecurityAdapterBeanRegistrar::class,
-            MemberAuthOpenEndpointPolicy::class,
-            CourseOpenEndpointPolicy::class,
-            CourseAuthorizationPolicy::class,
-            CourseRoleHierarchyConfiguration::class,
-        ],
         excludeName = [
             "org.yechan.ServiceAutoConfiguration",
             "org.yechan.ServiceBeanRegistrar",
+            "org.yechan.CourseRoleHierarchyConfiguration",
         ],
-
-    )
-    @Import(
-        CourseJwtAutoConfiguration::class,
-        CourseJwtBeanRegistrar::class,
     )
     class TestApplication {
         @RestController
@@ -241,24 +222,18 @@ class CommonSecurityAutoConfigurationTest {
     @TestConfiguration
     class RestTestClientConfiguration {
         @Bean
-        fun restTestClient(context: WebApplicationContext): RestTestClient {
-            val mockMvc =
-                MockMvcBuilders.webAppContextSetup(context)
-                    .apply<DefaultMockMvcBuilder>(SecurityMockMvcConfigurers.springSecurity())
-                    .build()
-            return RestTestClient.bindTo(mockMvc)
-                .apiVersionInserter(ApiVersionInserter.useHeader(HeaderConst.API_VERSION_HEADER))
-                .build()
-        }
+        fun mockMvc(context: WebApplicationContext): MockMvc = MockMvcBuilders.webAppContextSetup(context)
+            .apply<DefaultMockMvcBuilder>(SecurityMockMvcConfigurers.springSecurity())
+            .build()
 
         @Bean
-        fun rawRestTestClient(context: WebApplicationContext): RestTestClient {
-            val mockMvc =
-                MockMvcBuilders.webAppContextSetup(context)
-                    .apply<DefaultMockMvcBuilder>(SecurityMockMvcConfigurers.springSecurity())
-                    .build()
-            return RestTestClient.bindTo(mockMvc).build()
-        }
+        fun restTestClient(mockMvc: MockMvc): RestTestClient = RestTestClient.bindTo(mockMvc)
+            .apiVersionInserter(ApiVersionInserter.useHeader(HeaderConst.API_VERSION_HEADER))
+            .build()
+
+        @Bean
+        fun rawRestTestClient(mockMvc: MockMvc): RestTestClient = RestTestClient.bindTo(mockMvc)
+            .build()
 
         @Bean
         @org.springframework.context.annotation.Primary
@@ -273,7 +248,9 @@ class CommonSecurityAutoConfigurationTest {
         )
 
         @Bean
-        fun openEndpointCustomizer(policy: ApplicationOpenEndpointPolicy): AuthorizeHttpRequestsCustomizer = PrioritizedAuthorizeHttpRequestsCustomizer(
+        fun openEndpointCustomizer(
+            policy: ApplicationOpenEndpointPolicy,
+        ): AuthorizeHttpRequestsCustomizer = PrioritizedAuthorizeHttpRequestsCustomizer(
             0,
             ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(policy),
         )
