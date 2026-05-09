@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.getBean
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
@@ -133,7 +134,7 @@ class CommonSecurityAutoConfigurationTest {
     fun `블랙리스트에 등록된 토큰 요청은 인증 실패로 거부된다`() {
         val token = "blocked-token"
 
-        context.getBean(AccessTokenBlacklist::class.java)
+        context.getBean<AccessTokenBlacklist>()
             .blacklist(token, Duration.ofMinutes(10))
 
         restTestClient.get()
@@ -189,13 +190,7 @@ class CommonSecurityAutoConfigurationTest {
     )
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration(
-        excludeName = [
-            "org.yechan.ServiceAutoConfiguration",
-            "org.yechan.ServiceBeanRegistrar",
-            "org.yechan.CourseRoleHierarchyConfiguration",
-        ],
-    )
+    @EnableAutoConfiguration
     class TestApplication {
         @RestController
         @RequestMapping(version = "v1")

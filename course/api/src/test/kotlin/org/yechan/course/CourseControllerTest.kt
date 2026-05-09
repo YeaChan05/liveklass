@@ -3,6 +3,7 @@ package org.yechan.course
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.getBean
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
@@ -24,10 +25,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
-import org.yechan.ServiceBeanRegistrar
 import org.yechan.TokenGenerator
 import org.yechan.member.MemberRole
-import org.yechan.member.MemberSecurityAdapterBeanRegistrar
 import org.yechan.member.MemberSecurityAdapterConfiguration
 import java.time.LocalDateTime
 
@@ -190,7 +189,7 @@ class CourseControllerTest @Autowired constructor(
 
     @Test
     fun `CREATOR 역할은 CLASSMATE 권한을 상속한다`() {
-        val roleHierarchy = context.getBean(RoleHierarchy::class.java)
+        val roleHierarchy = context.getBean<RoleHierarchy>()
 
         val reachableAuthorities =
             roleHierarchy.getReachableGrantedAuthorities(
@@ -202,9 +201,9 @@ class CourseControllerTest @Autowired constructor(
 
     @Test
     @WithMockUser(username = "admin", roles = ["CREATOR"])
-    fun `관리자는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
+    fun `CREATOR는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
         val accessToken =
-            tokenGenerator.generate(3L, roles = setOf(MemberRole.ADMIN.name)).accessToken
+            tokenGenerator.generate(3L, roles = setOf(MemberRole.CREATOR.name)).accessToken
 
         restTestClient.post()
             .uri("/api/courses")
@@ -231,9 +230,7 @@ class CourseControllerTest @Autowired constructor(
     @EnableAutoConfiguration(
         exclude = [
             ServiceAutoConfiguration::class,
-            ServiceBeanRegistrar::class,
             MemberSecurityAdapterConfiguration::class,
-            MemberSecurityAdapterBeanRegistrar::class,
         ],
     )
     @Import(

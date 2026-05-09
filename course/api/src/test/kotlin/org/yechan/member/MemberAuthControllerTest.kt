@@ -20,7 +20,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
-import org.yechan.ServiceBeanRegistrar
 import org.yechan.TokenGenerator
 
 @SpringBootTest(
@@ -195,9 +194,7 @@ class MemberAuthControllerTest @Autowired constructor(
     @EnableAutoConfiguration(
         exclude = [
             ServiceAutoConfiguration::class,
-            ServiceBeanRegistrar::class,
             MemberSecurityAdapterConfiguration::class,
-            MemberSecurityAdapterBeanRegistrar::class,
         ],
     )
     @Import(
