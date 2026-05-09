@@ -12,4 +12,3 @@ class CourseRoleHierarchyConfiguration :
             RoleHierarchyImpl.fromHierarchy("ROLE_CREATOR > ROLE_CLASSMATE")
         }
     })
-
