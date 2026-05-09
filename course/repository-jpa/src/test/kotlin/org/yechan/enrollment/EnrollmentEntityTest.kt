@@ -45,7 +45,7 @@ class EnrollmentEntityTest {
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.CANCELLED)
     }
 
-    private fun courseEntity(courseId: Long): CourseEntity = CourseEntity.from(
+    private fun courseEntity(courseId: Long): CourseEntity = CourseEntity.of(
         CourseModelData(
             courseId = courseId,
             creatorId = 1L,

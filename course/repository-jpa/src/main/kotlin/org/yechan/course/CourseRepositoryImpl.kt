@@ -3,7 +3,7 @@ package org.yechan.course
 class CourseRepositoryImpl(
     private val courseJpaRepository: CourseJpaRepository,
 ) : CourseRepository {
-    override fun save(course: CourseModel): CourseModel = courseJpaRepository.save(CourseEntity.from(course, creatorId = course.creatorId!!))
+    override fun save(course: CourseModel): CourseModel = courseJpaRepository.save(CourseEntity.of(course, creatorId = course.creatorId!!))
         .toDomain()
 
     override fun findById(courseId: Long): CourseModel? = courseJpaRepository.findById(courseId).orElse(null)?.toDomain()

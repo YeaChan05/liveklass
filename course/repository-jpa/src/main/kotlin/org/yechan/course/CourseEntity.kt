@@ -42,7 +42,7 @@ class CourseEntity private constructor(
         get() = Money(priceAmount)
 
     companion object {
-        fun from(
+        fun of(
             course: CourseModel,
             creatorId: Long,
         ): CourseEntity = CourseEntity(
