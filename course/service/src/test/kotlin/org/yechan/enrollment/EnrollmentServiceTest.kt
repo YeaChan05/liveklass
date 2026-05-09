@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseModel
+import org.yechan.course.CourseModelData
 import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseService
@@ -14,19 +15,27 @@ import org.yechan.course.EnrollmentNotFoundException
 import org.yechan.course.Money
 import org.yechan.member.InactiveMemberException
 import org.yechan.member.MemberModel
+import org.yechan.member.MemberModelData
 import org.yechan.member.MemberNotFoundException
 import org.yechan.member.MemberRepository
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberStatus
+import java.time.Instant
 import java.time.LocalDateTime
 
 class EnrollmentServiceTest {
     private val memberRepository = FakeMemberRepository()
     private val courseRepository = FakeCourseRepository()
     private val enrollmentRepository = FakeEnrollmentRepository()
+    private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(memberRepository, courseRepository)
     private val service =
-        EnrollmentService(memberRepository, courseRepository, enrollmentRepository)
+        EnrollmentService(
+            memberRepository,
+            courseRepository,
+            enrollmentRepository,
+            waitlistRepository,
+        )
 
     @Test
     fun `클래스메이트는 모집 중인 강의를 신청하면 결제 대기 신청이 생성되고 좌석이 감소한다`() {
@@ -57,6 +66,7 @@ class EnrollmentServiceTest {
         }
 
         assertEquals("강의 정원을 초과할 수 없습니다.", exception.message)
+        assertEquals(3L, waitlistRepository.pop(course.courseId!!)?.memberId)
     }
 
     @Test
@@ -237,7 +247,7 @@ class EnrollmentServiceTest {
         id: Long,
         role: MemberRole,
         status: MemberStatus = MemberStatus.ACTIVE,
-    ) = MemberModel(
+    ) = MemberModelData(
         memberId = id,
         email = "user$id@example.com",
         passwordHash = "hash",
@@ -267,7 +277,22 @@ private class FakeCourseRepository : CourseRepository {
     private var nextId = 1L
 
     override fun save(course: CourseModel): CourseModel {
-        val saved = if (course.courseId == null) course.copy(courseId = nextId++) else course
+        val saved = if (course.courseId == null) {
+            CourseModelData(
+                courseId = nextId++,
+                creatorId = course.creatorId,
+                title = course.title,
+                description = course.description,
+                price = course.price,
+                capacity = course.capacity,
+                seatLeftCount = course.seatLeftCount,
+                periodStart = course.periodStart,
+                periodEnd = course.periodEnd,
+                status = course.status,
+            )
+        } else {
+            course
+        }
         courses[requireNotNull(saved.courseId)] = saved
         return saved
     }
@@ -283,7 +308,16 @@ private class FakeEnrollmentRepository : EnrollmentRepository {
 
     override fun save(enrollment: EnrollmentModel, courseId: Long): EnrollmentModel {
         val saved =
-            if (enrollment.enrollmentId == null) enrollment.copy(enrollmentId = nextId++) else enrollment
+            if (enrollment.enrollmentId == null) {
+                EnrollmentModelData(
+                    enrollmentId = nextId++,
+                    courseId = enrollment.courseId,
+                    memberId = enrollment.memberId,
+                    status = enrollment.status,
+                )
+            } else {
+                enrollment
+            }
         enrollments[requireNotNull(saved.enrollmentId)] = saved
         return saved
     }
@@ -292,4 +326,41 @@ private class FakeEnrollmentRepository : EnrollmentRepository {
 
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.values
         .filter { it.memberId == memberId }
+}
+
+private class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
+    private val entries = linkedMapOf<Long, MutableList<EnrollmentWaitlistEntry>>()
+
+    override fun enqueue(
+        courseId: Long,
+        memberId: Long,
+        requestedAt: Instant,
+    ) {
+        entries.getOrPut(courseId) { mutableListOf() } += EnrollmentWaitlistEntry(
+            courseId,
+            memberId,
+            requestedAt,
+        )
+    }
+
+    override fun pop(courseId: Long): EnrollmentWaitlistEntry? {
+        val queue = entries[courseId] ?: return null
+        val first = queue.removeFirstOrNull()
+        if (queue.isEmpty()) {
+            entries.remove(courseId)
+        }
+        return first
+    }
+
+    override fun remove(
+        courseId: Long,
+        memberId: Long,
+    ) {
+        entries[courseId]?.removeIf { it.memberId == memberId }
+        if (entries[courseId].isNullOrEmpty()) {
+            entries.remove(courseId)
+        }
+    }
+
+    override fun findCourseIds(): Set<Long> = entries.keys
 }

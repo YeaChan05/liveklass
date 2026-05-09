@@ -4,10 +4,12 @@ import org.springframework.transaction.annotation.Transactional
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
+import org.yechan.course.CourseStatus
 import org.yechan.course.EnrollmentNotFoundException
 import org.yechan.member.MemberModel
 import org.yechan.member.MemberNotFoundException
 import org.yechan.member.MemberRepository
+import java.time.Instant
 
 interface EnrollmentUseCase {
     fun enroll(command: EnrollCourseCommand): EnrollmentResult
@@ -24,17 +26,22 @@ class EnrollmentService(
     private val memberRepository: MemberRepository,
     private val courseRepository: CourseRepository,
     private val enrollmentRepository: EnrollmentRepository,
+    private val waitlistRepository: EnrollmentWaitlistRepository,
 ) : EnrollmentUseCase {
     @Transactional
     override fun enroll(command: EnrollCourseCommand): EnrollmentResult {
         activeMember(command.memberId)
         val course = courseRepository.findById(command.courseId) ?: throw CourseNotFoundException()
-        val reservedCourse =
-            try {
-                course.reserveSeat()
-            } catch (e: IllegalArgumentException) {
-                throw CourseInvalidStateException(e.message ?: "수강 신청할 수 없는 강의입니다.")
-            }
+        if (course.status == CourseStatus.OPEN && course.seatLeftCount <= 0) {
+            waitlistRepository.enqueue(
+                courseId = command.courseId,
+                memberId = command.memberId,
+                requestedAt = Instant.now(),
+            )
+            throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
+        }
+
+        val reservedCourse = course.reserveSeat()
         val savedCourse = courseRepository.save(reservedCourse)
         val enrollment = savedCourse.requestEnrollment(command.memberId)
 
