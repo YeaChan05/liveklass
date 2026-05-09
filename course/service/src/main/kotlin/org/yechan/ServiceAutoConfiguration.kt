@@ -7,12 +7,15 @@ import org.yechan.course.CourseService
 import org.yechan.course.CourseUseCase
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentUseCase
+import org.yechan.enrollment.EnrollmentWaitlistScheduler
 import org.yechan.member.MemberAuthService
 import org.yechan.member.MemberAuthUseCase
 
 @Import(ServiceBeanRegistrar::class)
 @AutoConfiguration
 class ServiceAutoConfiguration
+
+@AutoConfiguration
 class ServiceBeanRegistrar :
     BeanRegistrarDsl({
         registerBean<CourseUseCase> {
@@ -24,6 +27,14 @@ class ServiceBeanRegistrar :
 
         registerBean<EnrollmentUseCase> {
             EnrollmentService(
+                bean(),
+                bean(),
+                bean(),
+                bean(),
+            )
+        }
+        registerBean<EnrollmentWaitlistScheduler> {
+            EnrollmentWaitlistScheduler(
                 bean(),
                 bean(),
                 bean(),
