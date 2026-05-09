@@ -14,7 +14,7 @@ dependencies {
     }
 
     // spring boot dev tools
-    developmentOnly("org.springframework.boot:spring-boot-docker-compose")
+    runtimeOnly("org.springframework.boot:spring-boot-docker-compose")
 
     // spring liquibase org.liquibase:liquibase-gradle-plugin
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
