@@ -18,7 +18,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
+import org.yechan.ServiceBeanRegistrar
 import org.yechan.TokenGenerator
+import org.yechan.auth.MemberSecurityAdapterBeanRegistrar
+import org.yechan.auth.MemberSecurityAdapterConfiguration
 import org.yechan.course.CourseAuthorizationPolicy
 import org.yechan.member.MemberRole
 
@@ -109,7 +112,14 @@ class EnrollmentControllerTest @Autowired constructor(
     }
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration(exclude = [ServiceAutoConfiguration::class])
+    @EnableAutoConfiguration(
+        exclude = [
+            ServiceAutoConfiguration::class,
+            ServiceBeanRegistrar::class,
+            MemberSecurityAdapterConfiguration::class,
+            MemberSecurityAdapterBeanRegistrar::class,
+        ],
+    )
     @Import(
         CourseAuthorizationPolicy::class,
         EnrollmentController::class,
