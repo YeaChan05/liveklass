@@ -14,7 +14,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-
+  jpa:
+    hibernate:
+      ddl-auto: validate
 auth:
   token:
     access-expires-in: 3600 # 1 hour
