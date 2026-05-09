@@ -15,11 +15,12 @@ interface MemberProps {
 interface MemberModel :
     MemberProps,
     MemberIdentifier {
-    fun isActive() {
+    fun validateMemberStatus() {
         if (status != MemberStatus.ACTIVE) {
             throw InactiveMemberException()
         }
     }
+    fun canManageCourse(): Boolean = role == MemberRole.CREATOR
 }
 
 data class MemberModelData(

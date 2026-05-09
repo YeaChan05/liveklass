@@ -106,7 +106,7 @@ class MemberAuthService(
 
         val member = memberRepository.findById(userId)
             ?: throw InvalidRefreshTokenException()
-        member.isActive()
+        member.validateMemberStatus()
 
         val token = tokenGenerator.generate(requireNotNull(member.memberId), roles = setOf(member.role.name))
         return RefreshTokenResult(

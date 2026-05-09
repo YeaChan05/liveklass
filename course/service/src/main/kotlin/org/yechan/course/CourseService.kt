@@ -62,7 +62,7 @@ class CourseService(
 
     private fun activeMember(memberId: Long): MemberModel {
         val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
-        member.isActive()
+        member.validateMemberStatus()
         return member
     }
 
