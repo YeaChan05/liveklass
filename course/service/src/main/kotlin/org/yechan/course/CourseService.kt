@@ -24,7 +24,10 @@ class CourseService(
 ) : CourseUseCase {
     override fun getCourse(courseId: Long): CourseResult = (courseRepository.findById(courseId) ?: throw CourseNotFoundException()).toResult()
 
-    override fun getCourses(status: CourseStatus?): List<CourseResult> = courseRepository.findAll(status).map(CourseModel::toResult)
+    override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
+        null -> courseRepository.findAll()
+        else -> courseRepository.findAllByStatus(status)
+    }.map(CourseModel::toResult)
 
     @Transactional
     override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult {

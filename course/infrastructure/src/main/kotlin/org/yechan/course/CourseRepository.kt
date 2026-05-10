@@ -1,11 +1,13 @@
 package org.yechan.course
 
 interface CourseRepository {
-    fun save(course: CourseModel): CourseModel
-
     fun findById(courseId: Long): CourseModel?
 
-    fun findAll(status: CourseStatus?): List<CourseModel>
+    fun findAll(): List<CourseModel>
+
+    fun findAllByStatus(status: CourseStatus): List<CourseModel>
+
+    fun save(course: CourseModel): CourseModel
 
     fun reserveSeatIfAvailable(courseId: Long): Boolean
 
