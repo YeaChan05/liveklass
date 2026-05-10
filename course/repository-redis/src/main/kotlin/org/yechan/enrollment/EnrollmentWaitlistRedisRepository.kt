@@ -53,6 +53,23 @@ class EnrollmentWaitlistRedisRepository(
         .mapNotNull(String::toLongOrNull)
         .toCollection(linkedSetOf())
 
+    override fun isSoldOut(courseId: Long): Boolean = redisTemplate.hasKey(
+        EnrollmentWaitlistRedisKey.soldOut(courseId).value,
+    )
+
+    override fun markSoldOut(courseId: Long) {
+        redisTemplate.opsForValue().set(
+            EnrollmentWaitlistRedisKey.soldOut(courseId).value,
+            "true",
+        )
+    }
+
+    override fun clearSoldOut(courseId: Long) {
+        redisTemplate.delete(
+            EnrollmentWaitlistRedisKey.soldOut(courseId).value,
+        )
+    }
+
     private val zSetOperations
         get() = redisTemplate.opsForZSet()
 
@@ -74,6 +91,12 @@ private sealed interface EnrollmentWaitlistRedisKey {
         override val value: String = "$PREFIX:course:$courseId"
     }
 
+    data class SoldOut(
+        val courseId: Long,
+    ) : EnrollmentWaitlistRedisKey {
+        override val value: String = "$PREFIX:course:$courseId:sold-out"
+    }
+
     data object CourseIds : EnrollmentWaitlistRedisKey {
         override val value: String = "$PREFIX:courses"
     }
@@ -82,6 +105,8 @@ private sealed interface EnrollmentWaitlistRedisKey {
         private const val PREFIX = "course:enrollment:waitlist"
 
         fun byCourseId(courseId: Long): EnrollmentWaitlistRedisKey = ByCourseId(courseId)
+
+        fun soldOut(courseId: Long): EnrollmentWaitlistRedisKey = SoldOut(courseId)
 
         fun courseIds(): EnrollmentWaitlistRedisKey = CourseIds
     }
