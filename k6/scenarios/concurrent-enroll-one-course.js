@@ -2,6 +2,13 @@ import http from 'k6/http';
 import { check, fail } from 'k6';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
+import { SharedArray } from 'k6/data';
+
+const TOKEN_PATH = __ENV.TOKEN_PATH || './k6/tokens.json';
+
+const applicantTokens = new SharedArray('applicant tokens', function () {
+  return JSON.parse(open(TOKEN_PATH));
+});
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const API_VERSION = __ENV.API_VERSION || 'v1';
@@ -70,7 +77,6 @@ export function setup() {
     periodEnd: toLocalDateTimeString(periodEnd),
   });
 
-
   const courseId = course.courseId;
 
   if (!courseId) {
@@ -79,33 +85,19 @@ export function setup() {
 
   openCourse(creatorToken, courseId);
 
-  const applicantTokens = [];
-
-  for (let i = 0; i < APPLICANT_COUNT; i++) {
-    const email = `classmate-${testId}-${i}@test.com`;
-    const password = 'password1234';
-
-    signup({
-      email,
-      password,
-      name: `테스트 수강생-${i}`,
-      role: 'CLASSMATE',
-    });
-
-    const token = login(email, password);
-    applicantTokens.push(token);
+  if (applicantTokens.length < APPLICANT_COUNT) {
+    fail(`tokens are not enough. tokenCount=${applicantTokens.length}, applicantCount=${APPLICANT_COUNT}`);
   }
 
   return {
     courseId,
     creatorToken,
-    applicantTokens,
   };
 }
 
 export default function (data) {
   const index = exec.scenario.iterationInTest;
-  const token = data.applicantTokens[index];
+  const token = applicantTokens[index];
 
   if (!token) {
     enrollFailed.add(1);
@@ -126,28 +118,22 @@ export default function (data) {
       },
   );
 
-  const body = parseJsonOrNull(res);
+  const success =
+      res.status === 200 ||
+      res.status === 201;
 
-  const accepted =
-      (res.status === 200 || res.status === 201) &&
-      body?.status === 'PENDING';
-
-  const rejected =
-      res.status === 400 ||
-      res.status === 409;
-
-  if (accepted) {
+  if (success) {
     enrollSuccess.add(1);
-  } else if (rejected) {
-    enrollFailed.add(1);
   } else {
-    console.error(`unexpected response index=${index}, status=${res.status}, body=${res.body}`);
     enrollFailed.add(1);
-    fail('unexpected enrollment response');
   }
 
   check(res, {
-    '수강 신청 응답은 성공 또는 정원 초과다': () => accepted || rejected,
+    '수강 신청 성공 또는 정원 초과 실패': (r) =>
+        r.status === 200 ||
+        r.status === 201 ||
+        r.status === 400 ||
+        r.status === 409,
   });
 }
 

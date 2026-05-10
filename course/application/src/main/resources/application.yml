@@ -45,6 +45,17 @@ auth:
     refresh-expires-in: 86400 # 24 hours
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
 
+load-test:
+  member-token-generator:
+    enabled: ${MEMBER_TOKEN_GENERATOR_ENABLED:true}
+    count: ${MEMBER_TOKEN_GENERATOR_COUNT:5000}
+    output-path: ${MEMBER_TOKEN_GENERATOR_OUTPUT_PATH:./k6/tokens.json}
+    email-prefix: k6-classmate
+    email-domain: test.com
+    password-hash: NOT_USED_BY_K6
+    role: CLASSMATE
+    status: ACTIVE
+
 logging:
   file:
     path: ./logs
