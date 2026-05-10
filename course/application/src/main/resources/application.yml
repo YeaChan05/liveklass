@@ -10,6 +10,7 @@ spring:
   docker:
     compose:
       file: docker-compose.yaml
+      lifecycle-management: start-and-stop
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -17,8 +18,38 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+
+  metrics:
+    tags:
+      application: liveklass
+
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.95,0.99
+
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 auth:
   token:
     access-expires-in: 3600 # 1 hour
     refresh-expires-in: 86400 # 24 hours
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
+
+logging:
+  file:
+    path: ./logs
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger - %msg%n"
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG

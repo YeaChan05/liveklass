@@ -18,4 +18,8 @@ dependencies {
 
     // spring liquibase org.liquibase:liquibase-gradle-plugin
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
+
+    // observability
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
 }
