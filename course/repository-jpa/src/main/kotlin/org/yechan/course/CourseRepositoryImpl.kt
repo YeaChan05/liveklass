@@ -6,11 +6,18 @@ class CourseRepositoryImpl(
     override fun save(course: CourseModel): CourseModel = courseJpaRepository.save(CourseEntity.of(course, creatorId = course.creatorId!!))
         .toDomain()
 
-    override fun findById(courseId: Long): CourseModel? = courseJpaRepository.findById(courseId).orElse(null)?.toDomain()
+    override fun findById(courseId: Long): CourseModel? = courseJpaRepository.findById(courseId)
+        .map(CourseEntity::toDomain)
+        .orElse(null)
 
-    override fun findByIdForUpdate(courseId: Long): CourseModel? = courseJpaRepository.findByIdForUpdate(courseId)?.toDomain()
+    override fun reserveSeatIfAvailable(courseId: Long): Boolean = courseJpaRepository.reserveSeatIfAvailable(
+        courseId = courseId,
+        status = CourseStatus.OPEN,
+    ) == 1
 
     override fun findAll(): List<CourseModel> = courseJpaRepository.findAll().map(CourseEntity::toDomain)
+
+    override fun releaseSeatIfPossible(courseId: Long): Boolean = courseJpaRepository.releaseSeatIfPossible(courseId) == 1
 }
 
 private fun CourseEntity.toDomain(): CourseModel = CourseModelData(
