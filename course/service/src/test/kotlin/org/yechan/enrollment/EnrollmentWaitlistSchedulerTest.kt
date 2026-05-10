@@ -2,6 +2,7 @@ package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.yechan.course.CourseModel
 import org.yechan.course.CourseModelData
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseService
@@ -87,10 +88,10 @@ class EnrollmentWaitlistSchedulerTest {
     }
 
     private class FakeCourseRepository : CourseRepository {
-        private val courses = linkedMapOf<Long, org.yechan.course.CourseModel>()
+        private val courses = linkedMapOf<Long, CourseModel>()
         private var nextId = 1L
 
-        override fun save(course: org.yechan.course.CourseModel): org.yechan.course.CourseModel {
+        override fun save(course: CourseModel): CourseModel {
             val saved = if (course.courseId == null) {
                 CourseModelData(
                     courseId = nextId++,
@@ -111,9 +112,11 @@ class EnrollmentWaitlistSchedulerTest {
             return saved
         }
 
-        override fun findById(courseId: Long): org.yechan.course.CourseModel? = courses[courseId]
+        override fun findById(courseId: Long): CourseModel? = courses[courseId]
 
-        override fun findAll(): List<org.yechan.course.CourseModel> = courses.values.toList()
+        override fun findByIdForUpdate(courseId: Long): CourseModel? = courses[courseId]
+
+        override fun findAll(): List<CourseModel> = courses.values.toList()
     }
 
     private class FakeEnrollmentRepository : EnrollmentRepository {

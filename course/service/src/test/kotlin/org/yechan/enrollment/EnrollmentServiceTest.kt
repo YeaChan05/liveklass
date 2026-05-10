@@ -13,10 +13,8 @@ import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
 import org.yechan.course.EnrollmentNotFoundException
 import org.yechan.course.Money
-import org.yechan.member.InactiveMemberException
 import org.yechan.member.MemberModel
 import org.yechan.member.MemberModelData
-import org.yechan.member.MemberNotFoundException
 import org.yechan.member.MemberRepository
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberStatus
@@ -31,7 +29,6 @@ class EnrollmentServiceTest {
     private val courseService = CourseService(memberRepository, courseRepository)
     private val service =
         EnrollmentService(
-            memberRepository,
             courseRepository,
             enrollmentRepository,
             waitlistRepository,
@@ -66,7 +63,7 @@ class EnrollmentServiceTest {
         }
 
         assertEquals("강의 정원을 초과할 수 없습니다.", exception.message)
-        assertEquals(3L, waitlistRepository.pop(course.courseId!!)?.memberId)
+        assertEquals(3L, waitlistRepository.pop(course.courseId)?.memberId)
     }
 
     @Test
@@ -121,32 +118,6 @@ class EnrollmentServiceTest {
         assertEquals(EnrollmentStatus.CONFIRMED, confirmed.status)
         assertEquals(EnrollmentStatus.CANCELLED, cancelled.status)
         assertEquals(1, enrollments.size)
-    }
-
-    @Test
-    fun `존재하지 않는 회원은 수강 신청할 수 없다`() {
-        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
-        val course = courseService.createCourse(createCourseCommand(), 1L)
-        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
-
-        assertThrows(MemberNotFoundException::class.java) {
-            service.enroll(EnrollCourseCommand(memberId = 999L, courseId = course.courseId))
-        }
-    }
-
-    @Test
-    fun `비활성 회원은 수강 신청 목록을 조회할 수 없다`() {
-        memberRepository.save(
-            member(
-                id = 2L,
-                role = MemberRole.CLASSMATE,
-                status = MemberStatus.DELETED,
-            ),
-        )
-
-        assertThrows(InactiveMemberException::class.java) {
-            service.getMyEnrollments(2L)
-        }
     }
 
     @Test
@@ -298,6 +269,8 @@ private class FakeCourseRepository : CourseRepository {
     }
 
     override fun findById(courseId: Long): CourseModel? = courses[courseId]
+
+    override fun findByIdForUpdate(courseId: Long): CourseModel? = courses[courseId]
 
     override fun findAll(): List<CourseModel> = courses.values.toList()
 }
