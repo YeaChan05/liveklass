@@ -15,13 +15,4 @@ data class EnrollmentResult(
     val courseId: Long,
     val memberId: Long,
     val status: EnrollmentStatus,
-) {
-    companion object {
-        fun from(enrollment: EnrollmentModel): EnrollmentResult = EnrollmentResult(
-            enrollmentId = requireNotNull(enrollment.enrollmentId),
-            courseId = enrollment.courseId,
-            memberId = enrollment.memberId,
-            status = enrollment.status,
-        )
-    }
-}
+)
