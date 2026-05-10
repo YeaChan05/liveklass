@@ -1,19 +1,24 @@
-package org.yechan
+package org.yechan.auth
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.web.filter.OncePerRequestFilter
+import org.yechan.AccessTokenBlacklist
+import org.yechan.TokenParser
+import org.yechan.TokenVerifier
 
 class JwtAuthenticationFilter(
     private val parser: TokenParser,
     private val verifier: TokenVerifier,
     private val accessTokenBlacklist: AccessTokenBlacklist,
     private val authenticationEntryPoint: AuthenticationEntryPoint,
+    private val authenticationProvider: AuthenticationProvider,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -30,9 +35,9 @@ class JwtAuthenticationFilter(
             if (accessTokenBlacklist.contains(token)) {
                 throw BadCredentialsException("Blacklisted access token")
             }
-            val authentication = verifier.verify(token)
+            val authenticate = authenticationProvider.authenticate(verifier.verify(token))
             val context = SecurityContextHolder.createEmptyContext()
-            context.authentication = authentication
+            context.authentication = authenticate
             SecurityContextHolder.setContext(context)
             filterChain.doFilter(request, response)
         } catch (ex: AuthenticationException) {
