@@ -122,7 +122,7 @@ class EnrollmentEntityTest {
             entity.cancel()
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("이미 취소된 신청입니다.")
+            .hasMessage("결제 대기 상태에서만 취소가 가능합니다.")
     }
 
     private fun enrollmentEntity(
