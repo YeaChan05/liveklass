@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.NaturalId
 import org.yechan.BaseEntity
 
 @Entity
@@ -20,6 +21,7 @@ import org.yechan.BaseEntity
 )
 class MemberEntity private constructor(
     @field:Column(nullable = false, unique = true, length = 255)
+    @field:NaturalId
     override var email: String,
 
     @field:Column(name = "password_hash", nullable = false)
