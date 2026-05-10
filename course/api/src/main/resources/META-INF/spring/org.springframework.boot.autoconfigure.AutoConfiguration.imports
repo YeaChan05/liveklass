@@ -1,6 +1,6 @@
 org.yechan.ActuatorOpenEndpointPolicy
-org.yechan.auth.CourseJwtAutoConfiguration
-org.yechan.auth.CourseJwtBeanRegistrar
+org.yechan.auth.JwtAutoConfiguration
+org.yechan.member.MemberAuthenticationProviderAutoConfiguration
 org.yechan.member.MemberAuthOpenEndpointPolicy
 org.yechan.course.CourseOpenEndpointPolicy
 org.yechan.course.CourseAuthorizationPolicy
