@@ -28,20 +28,5 @@ data class CourseResult(
     val periodStart: LocalDateTime,
     val periodEnd: LocalDateTime,
     val status: CourseStatus,
-) {
-    companion object {
-        fun from(course: CourseModel): CourseResult = CourseResult(
-            courseId = requireNotNull(course.courseId),
-            creatorId = requireNotNull(course.creatorId),
-            title = course.title,
-            description = course.description,
-            price = course.price,
-            capacity = course.capacity,
-            seatLeftCount = course.seatLeftCount,
-            currentEnrollmentCount = course.capacity - course.seatLeftCount,
-            periodStart = course.periodStart,
-            periodEnd = course.periodEnd,
-            status = course.status,
-        )
-    }
-}
+    val enrolled: Boolean = false,
+)

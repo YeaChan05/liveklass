@@ -22,14 +22,12 @@ class CourseService(
     private val memberRepository: MemberRepository,
     private val courseRepository: CourseRepository,
 ) : CourseUseCase {
-    override fun getCourse(courseId: Long): CourseResult = CourseResult.from(
-        courseRepository.findById(courseId) ?: throw CourseNotFoundException(),
-    )
+    override fun getCourse(courseId: Long): CourseResult = (courseRepository.findById(courseId) ?: throw CourseNotFoundException()).toResult()
 
     override fun getCourses(status: CourseStatus?): List<CourseResult> = courseRepository.findAll()
         .asSequence()
         .filter { status == null || it.status == status }
-        .map(CourseResult::from)
+        .map(CourseModel::toResult)
         .toList()
 
     @Transactional
@@ -45,19 +43,19 @@ class CourseService(
             periodEnd = command.periodEnd,
         )
 
-        return CourseResult.from(courseRepository.save(course))
+        return courseRepository.save(course).toResult()
     }
 
     @Transactional
     override fun openCourse(command: CourseStatusCommand): CourseResult {
         val course = ownedCourse(command.courseId, command.memberId)
-        return CourseResult.from(courseRepository.save(course.open()))
+        return courseRepository.save(course.open()).toResult()
     }
 
     @Transactional
     override fun closeCourse(command: CourseStatusCommand): CourseResult {
         val course = ownedCourse(command.courseId, command.memberId)
-        return CourseResult.from(courseRepository.save(course.close()))
+        return courseRepository.save(course.close()).toResult()
     }
 
     private fun activeMember(memberId: Long): MemberModel {
@@ -76,3 +74,17 @@ class CourseService(
         return course
     }
 }
+
+private fun CourseModel.toResult(): CourseResult = CourseResult(
+    courseId = requireNotNull(courseId),
+    creatorId = requireNotNull(creatorId),
+    title = title,
+    description = description,
+    price = price,
+    capacity = capacity,
+    seatLeftCount = seatLeftCount,
+    currentEnrollmentCount = capacity - seatLeftCount,
+    periodStart = periodStart,
+    periodEnd = periodEnd,
+    status = status,
+)
