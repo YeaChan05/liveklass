@@ -21,6 +21,8 @@ interface MemberAuthUseCase {
     fun logout(command: LogoutCommand)
 
     fun getCurrentUser(userId: Long): CurrentMemberResult
+
+    fun getCurrentUserByEmail(email: String): CurrentMemberResult
 }
 
 @Transactional(readOnly = true)
@@ -135,6 +137,18 @@ class MemberAuthService(
             name = member.name,
             role = member.role,
             status = member.status,
+        )
+    }
+
+    override fun getCurrentUserByEmail(email: String): CurrentMemberResult {
+        val member = memberRepository.findByEmail(email)
+            ?: throw MemberNotFoundException()
+        return CurrentMemberResult(
+            id = member.memberId ?: throw MemberNotFoundException(),
+            email = member.email,
+            role = member.role,
+            status = member.status,
+            name = member.name,
         )
     }
 
