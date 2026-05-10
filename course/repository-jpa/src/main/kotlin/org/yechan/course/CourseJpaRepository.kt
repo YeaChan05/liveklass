@@ -33,4 +33,6 @@ interface CourseJpaRepository : JpaRepository<CourseEntity, Long> {
     fun releaseSeatIfPossible(
         @Param("courseId") courseId: Long,
     ): Int
+
+    fun findAllByStatus(status: CourseStatus): List<CourseEntity>
 }

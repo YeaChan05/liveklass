@@ -15,7 +15,16 @@ class CourseRepositoryImpl(
         status = CourseStatus.OPEN,
     ) == 1
 
-    override fun findAll(): List<CourseModel> = courseJpaRepository.findAll().map(CourseEntity::toDomain)
+    override fun findAll(status: CourseStatus?): List<CourseModel> {
+        val courses =
+            if (status == null) {
+                courseJpaRepository.findAll()
+            } else {
+                courseJpaRepository.findAllByStatus(status)
+            }
+
+        return courses.map(CourseEntity::toModel)
+    }
 
     override fun releaseSeatIfPossible(courseId: Long): Boolean = courseJpaRepository.releaseSeatIfPossible(courseId) == 1
 }

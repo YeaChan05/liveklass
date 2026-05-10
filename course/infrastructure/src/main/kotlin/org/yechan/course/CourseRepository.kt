@@ -5,7 +5,7 @@ interface CourseRepository {
 
     fun findById(courseId: Long): CourseModel?
 
-    fun findAll(): List<CourseModel>
+    fun findAll(status: CourseStatus?): List<CourseModel>
 
     fun reserveSeatIfAvailable(courseId: Long): Boolean
 
