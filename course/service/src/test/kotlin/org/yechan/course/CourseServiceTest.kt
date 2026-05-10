@@ -352,5 +352,7 @@ private class FakeCourseRepository : CourseRepository {
 
     override fun findById(courseId: Long): CourseModel? = courses[courseId]
 
+    override fun findByIdForUpdate(courseId: Long): CourseModel? = courses[courseId]
+
     override fun findAll(): List<CourseModel> = courses.values.toList()
 }
