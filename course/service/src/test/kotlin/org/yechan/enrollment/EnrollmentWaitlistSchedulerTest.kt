@@ -2,10 +2,8 @@ package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
-import org.yechan.course.CourseModel
-import org.yechan.course.CourseModelData
-import org.yechan.course.CourseRepository
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -86,40 +84,6 @@ class EnrollmentWaitlistSchedulerTest {
         override fun findByEmail(email: String): MemberModel? = members.values.firstOrNull { it.email == email }
 
         override fun findById(id: Long): MemberModel? = members[id]
-    }
-
-    private class FakeCourseRepository : CourseRepository {
-        private val courses = linkedMapOf<Long, CourseModel>()
-        private var nextId = 1L
-
-        override fun save(course: CourseModel): CourseModel {
-            val saved = if (course.courseId == null) {
-                CourseModelData(
-                    courseId = nextId++,
-                    creatorId = course.creatorId,
-                    title = course.title,
-                    description = course.description,
-                    price = course.price,
-                    capacity = course.capacity,
-                    seatLeftCount = course.seatLeftCount,
-                    periodStart = course.periodStart,
-                    periodEnd = course.periodEnd,
-                    status = course.status,
-                )
-            } else {
-                course
-            }
-            courses[requireNotNull(saved.courseId)] = saved
-            return saved
-        }
-
-        override fun findById(courseId: Long): CourseModel? = courses[courseId]
-
-        override fun findAll(): List<CourseModel> = courses.values.toList()
-
-        override fun reserveSeatIfAvailable(courseId: Long): Boolean = courses[courseId]?.let { it.seatLeftCount > 0 } ?: false
-
-        override fun releaseSeatIfPossible(courseId: Long): Boolean = courses[courseId]?.let { it.seatLeftCount < it.capacity } ?: false
     }
 
     private class FakeEnrollmentRepository : EnrollmentRepository {

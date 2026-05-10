@@ -67,26 +67,6 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `결제 확정과 수강 취소는 신청 상태를 바꾸고 취소 시 좌석을 되돌린다`() {
-        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
-        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
-        val course = courseService.createCourse(createCourseCommand(), 1L)
-        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
-        val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
-
-        val confirmed =
-            service.confirmEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
-        val cancelled =
-            service.cancelEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
-        val changedCourse = courseService.getCourse(course.courseId)
-
-        assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
-        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
-        assertThat(changedCourse.seatLeftCount).isEqualTo(2)
-    }
-
-    @Test
     fun `내 수강 신청 목록을 조회한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
@@ -101,23 +81,42 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `크리에이터는 수강생이 가능한 수강 신청 상태 변경 목록 조회를 할 수 있다`() {
+    fun `CREATOR는 수강 신청 확정 목록 조회를 할 수 있다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
             service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+
         val confirmed =
             service.confirmEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
-        val cancelled =
-            service.cancelEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
+
         val enrollments = service.getMyEnrollments(1L)
 
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
+        assertThat(enrollments).hasSize(1)
+        assertThat(enrollments.single().status).isEqualTo(EnrollmentStatus.CONFIRMED)
+    }
+
+    @Test
+    fun `CREATOR는 결제 대기 상태의 본인 수강 신청을 취소할 수 있다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val enrollment =
+            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+
+        val cancelled =
+            service.cancelEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
+
+        val changedCourse = courseService.getCourse(course.courseId)
+
+        assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
-        assertThat(enrollments.size).isEqualTo(1)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(2)
     }
 
     @Test
@@ -202,7 +201,7 @@ class EnrollmentServiceTest {
             )
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("이미 취소된 신청입니다.")
+            .hasMessage("결제 대기 상태에서만 취소가 가능합니다.")
     }
 
     @Test
@@ -282,23 +281,17 @@ class EnrollmentServiceTest {
     fun `결제 대기 신청을 취소하면 신청 상태가 취소되고 좌석이 반환된다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
-        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
-        val enrollment = service.enroll(
-            EnrollCourseCommand(
-                memberId = 2L,
-                courseId = course.courseId,
-            ),
-        )
+        val enrollment =
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
 
         val beforeCancelCourse = courseService.getCourse(course.courseId)
-        val cancelled = service.cancelEnrollment(
-            EnrollmentStatusCommand(
-                memberId = 2L,
-                enrollmentId = enrollment.enrollmentId,
-            ),
-        )
+
+        val cancelled =
+            service.cancelEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
+
         val afterCancelCourse = courseService.getCourse(course.courseId)
 
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
@@ -308,38 +301,31 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `확정된 신청을 취소하면 신청 상태가 취소되고 좌석이 반환된다`() {
+    fun `확정된 신청은 취소할 수 없다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
-        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
-        val enrollment = service.enroll(
-            EnrollCourseCommand(
-                memberId = 2L,
-                courseId = course.courseId,
-            ),
-        )
-        val confirmed = service.confirmEnrollment(
-            EnrollmentStatusCommand(
-                memberId = 2L,
-                enrollmentId = enrollment.enrollmentId,
-            ),
-        )
+        val enrollment =
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+
+        val confirmed =
+            service.confirmEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
 
         val beforeCancelCourse = courseService.getCourse(course.courseId)
-        val cancelled = service.cancelEnrollment(
-            EnrollmentStatusCommand(
-                memberId = 2L,
-                enrollmentId = enrollment.enrollmentId,
-            ),
-        )
+
+        assertThatThrownBy {
+            service.cancelEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("결제 대기 상태에서만 취소가 가능합니다.")
+
         val afterCancelCourse = courseService.getCourse(course.courseId)
 
         assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
         assertThat(beforeCancelCourse.seatLeftCount).isEqualTo(1)
-        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
-        assertThat(afterCancelCourse.seatLeftCount).isEqualTo(2)
+        assertThat(afterCancelCourse.seatLeftCount).isEqualTo(1)
     }
 
     @Test
@@ -449,6 +435,34 @@ class EnrollmentServiceTest {
         assertThat(waitlisted?.memberId).isEqualTo(2L)
         assertThat(enrollments).isEmpty()
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+    }
+
+    @Test
+    fun `결제 대기 신청은 결제 확정할 수 있다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        val confirmed = service.confirmEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+
+        val changedCourse = courseService.getCourse(course.courseId)
+
+        assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(1)
     }
 
     private fun createCourseCommand(

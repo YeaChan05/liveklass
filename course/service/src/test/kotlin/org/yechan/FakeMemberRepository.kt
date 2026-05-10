@@ -57,6 +57,7 @@ class FakeCourseRepository : CourseRepository {
     override fun findById(courseId: Long): CourseModel? = courses[courseId]
 
     override fun findAll(): List<CourseModel> = courses.values.toList()
+    override fun findAllByStatus(status: CourseStatus): List<CourseModel> = courses.values.filter { it.status == status }
 
     override fun reserveSeatIfAvailable(courseId: Long): Boolean {
         val course = courses[courseId] ?: return false
