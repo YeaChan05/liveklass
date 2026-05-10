@@ -25,6 +25,12 @@ interface EnrollmentWaitlistRepository {
     )
 
     fun findCourseIds(): Set<Long>
+
+    fun isSoldOut(courseId: Long): Boolean
+
+    fun markSoldOut(courseId: Long)
+
+    fun clearSoldOut(courseId: Long)
 }
 
 data class EnrollmentWaitlistEntry(
