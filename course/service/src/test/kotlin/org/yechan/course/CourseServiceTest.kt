@@ -16,7 +16,7 @@ class CourseServiceTest {
     private val service = CourseService(memberRepository, courseRepository)
 
     @Test
-    fun `크리에이터는 강의를 등록하고 모집을 시작하고 마감한다`() {
+    fun `CREATOR는 강의를 등록하고 모집을 시작하고 마감한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
 
         val created = service.createCourse(createCourseCommand(), 1L)
