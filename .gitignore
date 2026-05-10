@@ -39,3 +39,4 @@ bin/
 graphify-out/
 .omx/
 .codex/*
+**/logs/
