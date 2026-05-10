@@ -4,7 +4,8 @@ model_reasoning_effort = "medium"
 developer_instructions = "You have oh-my-codex installed. AGENTS.md is the orchestration brain and main control surface. Follow AGENTS.md for skill/keyword routing, $name workflow invocation, and role-specialized subagents. Use outcome-first, concise progress updates: state the target result, constraints, validation evidence, and stop condition before adding process detail. Native subagents live in .codex/agents and may handle independent parallel subtasks within one Codex session or team pane. Skills load from .codex/skills, not native-agent TOMLs. Treat installed prompts as narrower execution surfaces under AGENTS.md authority."
 
 
-model = "gpt-5.5"
+
+model = "gpt-5.4-mini"
 model_context_window = 1000000
 model_auto_compact_token_limit = 900000
 approvals_reviewer = "user"
@@ -20,22 +21,24 @@ max_depth = 1
 network_access = true
 
 [features]
+hooks = true
+shell_snapshot = true
 apps = false
 multi_agent = true
 goals = true
 
 child_agents_md = true
-codex_hooks = true
 
+codex_hooks = true
 [apps._default]
 enabled = false
-
-[env]
-USE_OMX_EXPLORE_CMD = "1"
 
 [profiles.lean]
 web_search = "cached"
 tool_output_token_limit = 2000
+
+[shell_environment_policy.set]
+USE_OMX_EXPLORE_CMD = "1"
 
 # ============================================================
 # oh-my-codex (OMX) Configuration
@@ -63,6 +66,9 @@ args = ["/opt/homebrew/lib/node_modules/oh-my-codex/dist/mcp/code-intel-server.j
 enabled = true
 startup_timeout_sec = 10
 
+[mcp_servers.omx_code_intel.tools.lsp_document_symbols]
+approval_mode = "approve"
+
 # OMX Trace MCP Server (agent flow timeline & statistics)
 [mcp_servers.omx_trace]
 command = "node"
@@ -77,13 +83,13 @@ args = ["/opt/homebrew/lib/node_modules/oh-my-codex/dist/mcp/wiki-server.js"]
 enabled = true
 startup_timeout_sec = 5
 
+[mcp_servers.omx_wiki.tools.wiki_list]
+approval_mode = "approve"
+
 # OMX TUI StatusLine (Codex CLI v0.101.0+)
 [tui]
 # omx:managed-status-line
 status_line = ["model-with-reasoning", "git-branch", "context-remaining", "total-input-tokens", "total-output-tokens", "five-hour-limit", "weekly-limit"]
-
-[projects."/Users/shinyechan/IdeaProjects/liveklass"]
-trust_level = "trusted"
 
 # ============================================================
 # End oh-my-codex
