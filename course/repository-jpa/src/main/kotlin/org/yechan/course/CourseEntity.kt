@@ -4,13 +4,26 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import org.yechan.BaseEntity
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "courses")
+@Table(
+    name = "courses",
+    indexes = [
+        Index(
+            name = "idx_courses_status",
+            columnList = "status",
+        ),
+        Index(
+            name = "idx_courses_creator_id",
+            columnList = "creator_id",
+        ),
+    ],
+)
 class CourseEntity private constructor(
     @field:Column(nullable = false)
     override var creatorId: Long,

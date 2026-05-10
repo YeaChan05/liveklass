@@ -54,3 +54,22 @@ CREATE TABLE enrollments (
     INDEX idx_enrollments_course_status (course_id, status),
     INDEX idx_enrollments_course_id (course_id)
 );
+
+
+ALTER TABLE members
+    ADD CONSTRAINT uk_members_email UNIQUE (email);
+
+CREATE INDEX idx_courses_status
+    ON courses (status);
+
+CREATE INDEX idx_courses_creator_id
+    ON courses (creator_id);
+
+ALTER TABLE enrollments
+    ADD CONSTRAINT uk_enrollments_course_member UNIQUE (course_id, member_id);
+
+CREATE INDEX idx_enrollments_member_id
+    ON enrollments (member_id);
+
+CREATE INDEX idx_enrollments_course_status
+    ON enrollments (course_id, status);
