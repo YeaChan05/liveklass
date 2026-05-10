@@ -30,7 +30,6 @@ class ServiceBeanRegistrar :
                 bean(),
                 bean(),
                 bean(),
-                bean(),
             )
         }
         registerBean<EnrollmentWaitlistScheduler> {
