@@ -84,15 +84,191 @@ class CourseRepositoryImplTest {
         assertThat(all.map { it.title }).containsExactlyInAnyOrder("강의 1", "강의 2")
     }
 
+    @Test
+    fun `상태로 강의 목록을 조회할 수 있다`() {
+        courseRepository.save(course(title = "초안 강의", status = CourseStatus.DRAFT))
+        courseRepository.save(course(title = "모집 중 강의", status = CourseStatus.OPEN))
+        courseRepository.save(course(title = "마감 강의", status = CourseStatus.CLOSED))
+
+        val openCourses = courseRepository.findAllByStatus(CourseStatus.OPEN)
+
+        assertThat(openCourses).hasSize(1)
+        assertThat(openCourses[0].title).isEqualTo("모집 중 강의")
+        assertThat(openCourses[0].status).isEqualTo(CourseStatus.OPEN)
+    }
+
+    @Test
+    fun `모집 중이고 남은 좌석이 있으면 좌석을 선점할 수 있다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.OPEN,
+                capacity = 30,
+                seatLeftCount = 10,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val reserved = courseRepository.reserveSeatIfAvailable(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(reserved).isTrue()
+        assertThat(found?.seatLeftCount).isEqualTo(9)
+    }
+
+    @Test
+    fun `초안 상태 강의는 좌석을 선점할 수 없다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.DRAFT,
+                capacity = 30,
+                seatLeftCount = 10,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val reserved = courseRepository.reserveSeatIfAvailable(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(reserved).isFalse()
+        assertThat(found?.seatLeftCount).isEqualTo(10)
+    }
+
+    @Test
+    fun `마감 상태 강의는 좌석을 선점할 수 없다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.CLOSED,
+                capacity = 30,
+                seatLeftCount = 10,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val reserved = courseRepository.reserveSeatIfAvailable(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(reserved).isFalse()
+        assertThat(found?.seatLeftCount).isEqualTo(10)
+    }
+
+    @Test
+    fun `남은 좌석이 없으면 좌석을 선점할 수 없다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.OPEN,
+                capacity = 30,
+                seatLeftCount = 0,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val reserved = courseRepository.reserveSeatIfAvailable(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(reserved).isFalse()
+        assertThat(found?.seatLeftCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `존재하지 않는 강의는 좌석을 선점할 수 없다`() {
+        val reserved = courseRepository.reserveSeatIfAvailable(-1L)
+
+        assertThat(reserved).isFalse()
+    }
+
+    @Test
+    fun `좌석 수가 정원보다 작으면 좌석을 반환할 수 있다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.OPEN,
+                capacity = 30,
+                seatLeftCount = 10,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val released = courseRepository.releaseSeatIfPossible(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(released).isTrue()
+        assertThat(found?.seatLeftCount).isEqualTo(11)
+    }
+
+    @Test
+    fun `좌석 수가 이미 정원과 같으면 좌석을 반환할 수 없다`() {
+        val saved = courseRepository.save(
+            course(
+                status = CourseStatus.OPEN,
+                capacity = 30,
+                seatLeftCount = 30,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val released = courseRepository.releaseSeatIfPossible(saved.courseId!!)
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val found = courseRepository.findById(saved.courseId!!)
+
+        assertThat(released).isFalse()
+        assertThat(found?.seatLeftCount).isEqualTo(30)
+    }
+
+    @Test
+    fun `존재하지 않는 강의는 좌석을 반환할 수 없다`() {
+        val released = courseRepository.releaseSeatIfPossible(-1L)
+
+        assertThat(released).isFalse()
+    }
+
     private fun course(
         title: String = "테스트 강의",
         creatorId: Long = 1L,
+        seatLeftCount: Int = 30,
+        capacity: Int = 30,
+        status: CourseStatus = CourseStatus.OPEN,
     ) = CourseModelData(
         title = title,
         description = "테스트 설명",
         creatorId = creatorId,
         price = Money(10000),
-        capacity = 30,
+        capacity = capacity,
+        status = status,
+        seatLeftCount = seatLeftCount,
         periodStart = LocalDateTime.now().plusDays(1),
         periodEnd = LocalDateTime.now().plusDays(7),
     )
