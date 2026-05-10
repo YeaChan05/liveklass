@@ -228,9 +228,24 @@ subprojects {
         }
     }
 }
+val jacocoExcludes = listOf(
+    "**/*Application*",
+    "**/model/**",
+    "**/*Dtos*",
+    "**/*Request*",
+    "**/*Response*",
+    "**/exception/**",
+    "**/generated/**",
+    "**/*Config*",
+)
+
+fun Project.jacocoMainClassDirectories() = fileTree(layout.buildDirectory.dir("classes/kotlin/main")) {
+    exclude(jacocoExcludes)
+}
 
 tasks.register<JacocoReport>("jacocoRootReport") {
     dependsOn(subprojects.map { it.tasks.withType<Test>() })
+
     executionData(
         subprojects.flatMap {
             listOf(
@@ -239,10 +254,64 @@ tasks.register<JacocoReport>("jacocoRootReport") {
             )
         },
     )
-    sourceDirectories.from(subprojects.map { it.file("src/main/kotlin") })
-    classDirectories.from(subprojects.map { it.layout.buildDirectory.dir("classes/kotlin/main") })
+
+    sourceDirectories.from(
+        subprojects.map { it.file("src/main/kotlin") },
+    )
+
+    classDirectories.setFrom(
+        files(
+            subprojects.map { it.jacocoMainClassDirectories() },
+        ),
+    )
+
     reports {
         xml.required.set(true)
         html.required.set(true)
     }
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoRootCoverageVerification") {
+    dependsOn("jacocoRootReport")
+
+    executionData(
+        subprojects.flatMap {
+            listOf(
+                it.layout.buildDirectory.file("jacoco/test.exec"),
+                it.layout.buildDirectory.file("jacoco/integrationTest.exec"),
+            )
+        },
+    )
+
+    sourceDirectories.from(
+        subprojects.map { it.file("src/main/kotlin") },
+    )
+
+    classDirectories.setFrom(
+        files(
+            subprojects.map { it.jacocoMainClassDirectories() },
+        ),
+    )
+
+    violationRules {
+        rule {
+            enabled = true
+
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.85".toBigDecimal()
+            }
+
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.named("test") {
+    dependsOn("jacocoRootCoverageVerification")
 }
