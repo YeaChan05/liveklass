@@ -189,6 +189,7 @@ configureByTypeHaving("boot", "jpa", "repository") {
 configureByTypeHaving("boot", "application") {
     apply {
         plugin("org.springframework.boot")
+        plugin("org.springframework.boot.aot")
     }
 
     dependencies {

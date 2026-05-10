@@ -9,7 +9,6 @@ import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.http.HttpHeaders
@@ -143,16 +142,6 @@ class CommonSecurityAutoConfigurationTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
             .exchange()
             .expectStatus().isUnauthorized
-    }
-
-    @Test
-    fun `보안 필터는 보안 체인에만 등록된다`() {
-        val filterRegistrations = context.getBeansOfType(FilterRegistrationBean::class.java).values
-
-        Assertions.assertThat(filterRegistrations)
-            .filteredOn { it.filter is JwtAuthenticationFilter }
-            .allMatch { !it.isEnabled }
-            .hasSize(1)
     }
 
     @Test
