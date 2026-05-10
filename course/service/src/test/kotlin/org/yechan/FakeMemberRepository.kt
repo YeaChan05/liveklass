@@ -4,6 +4,7 @@ import org.yechan.course.CourseModel
 import org.yechan.course.CourseModelData
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseStatus
+import org.yechan.enrollment.EnrollmentExpirationTarget
 import org.yechan.enrollment.EnrollmentModel
 import org.yechan.enrollment.EnrollmentModelData
 import org.yechan.enrollment.EnrollmentRepository
@@ -12,6 +13,7 @@ import org.yechan.enrollment.EnrollmentWaitlistRepository
 import org.yechan.member.MemberModel
 import org.yechan.member.MemberRepository
 import java.time.Instant
+import java.time.LocalDateTime
 
 class FakeMemberRepository : MemberRepository {
     private val members = linkedMapOf<Long, MemberModel>()
@@ -136,6 +138,27 @@ class FakeEnrollmentRepository : EnrollmentRepository {
     override fun findById(enrollmentId: Long): EnrollmentModel? = enrollments[enrollmentId]
 
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.values.filter { it.memberId == memberId }
+
+    override fun findExpiredPaymentPendingTargets(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<EnrollmentExpirationTarget> = enrollments.values
+        .filter { it.isPaymentPendingExpired(now) }
+        .sortedBy { it.paymentPendingExpiresAt }
+        .map { EnrollmentExpirationTarget(it.courseId, it.memberId) }
+        .take(limit)
+
+    override fun expirePaymentPendingIfExpired(
+        enrollmentId: Long,
+        now: LocalDateTime,
+    ): Boolean {
+        val enrollment = enrollments[enrollmentId] ?: return false
+        if (enrollment.isPaymentPendingExpired(now)) {
+            enrollments.remove(enrollmentId)
+            return true
+        }
+        return false
+    }
 }
 
 class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {

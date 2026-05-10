@@ -111,5 +111,22 @@ class EnrollmentWaitlistSchedulerTest {
         override fun findById(enrollmentId: Long): EnrollmentModel? = enrollments.firstOrNull { it.enrollmentId == enrollmentId }
 
         override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.filter { it.memberId == memberId }
+
+        override fun findExpiredPaymentPendingTargets(
+            now: LocalDateTime,
+            limit: Int,
+        ): List<EnrollmentExpirationTarget> = enrollments
+            .filter { it.status == EnrollmentStatus.PENDING && it.paymentPendingExpiresAt <= now }
+            .sortedBy { it.paymentPendingExpiresAt }
+            .map { EnrollmentExpirationTarget(it.enrollmentId!!, it.courseId) }
+            .take(limit)
+
+        override fun expirePaymentPendingIfExpired(
+            enrollmentId: Long,
+            now: LocalDateTime,
+        ): Boolean = enrollments
+            .find { it.enrollmentId == enrollmentId }
+            ?.let { it.status == EnrollmentStatus.PENDING && it.paymentPendingExpiresAt <= now }
+            ?: false
     }
 }
