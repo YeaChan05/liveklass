@@ -1,5 +1,6 @@
 package org.yechan.course
 
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -49,10 +50,10 @@ class EnrollmentModelTest {
     }
 
     @Test
-    fun `확정된 신청은 취소할 수 있다`() {
-        val cancelled = enrollment().confirmPayment().cancel()
-
-        assertEquals(EnrollmentStatus.CANCELLED, cancelled.status)
+    fun `확정된 신청은 취소할 수 없다`() {
+        assertThatThrownBy { enrollment().confirmPayment().cancel() }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("결제 대기 상태에서만 취소가 가능합니다.")
     }
 
     @Test
