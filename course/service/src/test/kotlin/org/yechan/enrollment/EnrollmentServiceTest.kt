@@ -1,7 +1,7 @@
 package org.yechan.enrollment
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
@@ -43,8 +43,8 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
         val changedCourse = courseService.getCourse(course.courseId)
 
-        assertEquals(EnrollmentStatus.PENDING, enrollment.status)
-        assertEquals(1, changedCourse.seatLeftCount)
+        assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(1)
     }
 
     @Test
@@ -56,12 +56,14 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
 
-        val exception = assertThrows(CourseInvalidStateException::class.java) {
+        assertThatThrownBy {
             service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
         }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("강의 정원을 초과할 수 없습니다.")
 
-        assertEquals("강의 정원을 초과할 수 없습니다.", exception.message)
-        assertEquals(3L, waitlistRepository.pop(course.courseId)?.memberId)
+        assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
     }
 
     @Test
@@ -79,9 +81,9 @@ class EnrollmentServiceTest {
             service.cancelEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
         val changedCourse = courseService.getCourse(course.courseId)
 
-        assertEquals(EnrollmentStatus.CONFIRMED, confirmed.status)
-        assertEquals(EnrollmentStatus.CANCELLED, cancelled.status)
-        assertEquals(2, changedCourse.seatLeftCount)
+        assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
+        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(2)
     }
 
     @Test
@@ -94,8 +96,8 @@ class EnrollmentServiceTest {
 
         val enrollments = service.getMyEnrollments(2L)
 
-        assertEquals(1, enrollments.size)
-        assertEquals(2L, enrollments.single().memberId)
+        assertThat(enrollments.size).isEqualTo(1)
+        assertThat(enrollments.single().memberId).isEqualTo(2L)
     }
 
     @Test
@@ -112,19 +114,20 @@ class EnrollmentServiceTest {
             service.cancelEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
         val enrollments = service.getMyEnrollments(1L)
 
-        assertEquals(EnrollmentStatus.PENDING, enrollment.status)
-        assertEquals(EnrollmentStatus.CONFIRMED, confirmed.status)
-        assertEquals(EnrollmentStatus.CANCELLED, cancelled.status)
-        assertEquals(1, enrollments.size)
+        assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
+        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
+        assertThat(enrollments.size).isEqualTo(1)
     }
 
     @Test
     fun `존재하지 않는 강의는 수강 신청할 수 없다`() {
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
 
-        assertThrows(CourseNotFoundException::class.java) {
+        assertThatThrownBy {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = 999L))
         }
+            .isInstanceOf(CourseNotFoundException::class.java)
     }
 
     @Test
@@ -137,7 +140,7 @@ class EnrollmentServiceTest {
         val enrollment =
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
 
-        assertThrows(EnrollmentNotFoundException::class.java) {
+        assertThatThrownBy {
             service.confirmEnrollment(
                 EnrollmentStatusCommand(
                     memberId = 3L,
@@ -145,6 +148,7 @@ class EnrollmentServiceTest {
                 ),
             )
         }
+            .isInstanceOf(EnrollmentNotFoundException::class.java)
     }
 
     @Test
@@ -162,7 +166,7 @@ class EnrollmentServiceTest {
             ),
         )
 
-        val exception = assertThrows(CourseInvalidStateException::class.java) {
+        assertThatThrownBy {
             service.confirmEnrollment(
                 EnrollmentStatusCommand(
                     memberId = 2L,
@@ -170,8 +174,8 @@ class EnrollmentServiceTest {
                 ),
             )
         }
-
-        assertEquals("결제 대기 상태의 신청만 확정할 수 있습니다.", exception.message)
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("결제 대기 상태의 신청만 확정할 수 있습니다.")
     }
 
     @Test
@@ -189,7 +193,7 @@ class EnrollmentServiceTest {
             ),
         )
 
-        val exception = assertThrows(CourseInvalidStateException::class.java) {
+        assertThatThrownBy {
             service.cancelEnrollment(
                 EnrollmentStatusCommand(
                     memberId = 2L,
@@ -197,8 +201,254 @@ class EnrollmentServiceTest {
                 ),
             )
         }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("이미 취소된 신청입니다.")
+    }
 
-        assertEquals("이미 취소된 신청입니다.", exception.message)
+    @Test
+    fun `모집 전 강의는 수강 신청할 수 없다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+
+        assertThatThrownBy {
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+    }
+
+    @Test
+    fun `마감된 강의는 수강 신청할 수 없다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        courseService.closeCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        assertThatThrownBy {
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+    }
+
+    @Test
+    fun `존재하지 않는 수강 신청은 확정할 수 없다`() {
+        assertThatThrownBy {
+            service.confirmEnrollment(
+                EnrollmentStatusCommand(
+                    memberId = 1L,
+                    enrollmentId = 999L,
+                ),
+            )
+        }
+            .isInstanceOf(EnrollmentNotFoundException::class.java)
+    }
+
+    @Test
+    fun `취소된 신청은 결제 확정할 수 없다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+
+        assertThatThrownBy {
+            service.confirmEnrollment(
+                EnrollmentStatusCommand(
+                    memberId = 2L,
+                    enrollmentId = enrollment.enrollmentId,
+                ),
+            )
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("결제 대기 상태의 신청만 확정할 수 있습니다.")
+    }
+
+    @Test
+    fun `결제 대기 신청을 취소하면 신청 상태가 취소되고 좌석이 반환된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        val beforeCancelCourse = courseService.getCourse(course.courseId)
+        val cancelled = service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+        val afterCancelCourse = courseService.getCourse(course.courseId)
+
+        assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(beforeCancelCourse.seatLeftCount).isEqualTo(1)
+        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
+        assertThat(afterCancelCourse.seatLeftCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `확정된 신청을 취소하면 신청 상태가 취소되고 좌석이 반환된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+        val confirmed = service.confirmEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+
+        val beforeCancelCourse = courseService.getCourse(course.courseId)
+        val cancelled = service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+        val afterCancelCourse = courseService.getCourse(course.courseId)
+
+        assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
+        assertThat(beforeCancelCourse.seatLeftCount).isEqualTo(1)
+        assertThat(cancelled.status).isEqualTo(EnrollmentStatus.CANCELLED)
+        assertThat(afterCancelCourse.seatLeftCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `다른 회원의 수강 신청은 취소할 수 없다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        assertThatThrownBy {
+            service.cancelEnrollment(
+                EnrollmentStatusCommand(
+                    memberId = 3L,
+                    enrollmentId = enrollment.enrollmentId,
+                ),
+            )
+        }
+            .isInstanceOf(EnrollmentNotFoundException::class.java)
+
+        val changedCourse = courseService.getCourse(course.courseId)
+
+        assertThat(changedCourse.seatLeftCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `존재하지 않는 수강 신청은 취소할 수 없다`() {
+        assertThatThrownBy {
+            service.cancelEnrollment(
+                EnrollmentStatusCommand(
+                    memberId = 1L,
+                    enrollmentId = 999L,
+                ),
+            )
+        }
+            .isInstanceOf(EnrollmentNotFoundException::class.java)
+    }
+
+    @Test
+    fun `수강 취소로 좌석이 반환되면 매진 표시가 해제된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val enrollment = service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        assertThatThrownBy {
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 3L,
+                    courseId = course.courseId,
+                ),
+            )
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrollment.enrollmentId,
+            ),
+        )
+
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `이미 매진 표시된 강의는 좌석 확보를 시도하지 않고 대기열에 등록한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        waitlistRepository.markSoldOut(course.courseId)
+
+        assertThatThrownBy {
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            )
+        }
+            .isInstanceOf(CourseInvalidStateException::class.java)
+            .hasMessage("강의 정원을 초과할 수 없습니다.")
+
+        val changedCourse = courseService.getCourse(course.courseId)
+        val waitlisted = waitlistRepository.pop(course.courseId)
+        val enrollments = service.getMyEnrollments(2L)
+
+        assertThat(changedCourse.seatLeftCount).isEqualTo(2)
+        assertThat(waitlisted?.memberId).isEqualTo(2L)
+        assertThat(enrollments).isEmpty()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
     }
 
     private fun createCourseCommand(
