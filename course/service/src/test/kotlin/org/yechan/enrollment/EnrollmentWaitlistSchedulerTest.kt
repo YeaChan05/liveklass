@@ -2,6 +2,7 @@ package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.course.CourseModel
 import org.yechan.course.CourseModelData
 import org.yechan.course.CourseRepository
@@ -146,42 +147,5 @@ class EnrollmentWaitlistSchedulerTest {
         override fun findById(enrollmentId: Long): EnrollmentModel? = enrollments.firstOrNull { it.enrollmentId == enrollmentId }
 
         override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.filter { it.memberId == memberId }
-    }
-
-    private class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
-        private val entries = linkedMapOf<Long, MutableList<EnrollmentWaitlistEntry>>()
-
-        override fun enqueue(
-            courseId: Long,
-            memberId: Long,
-            requestedAt: Instant,
-        ) {
-            entries.getOrPut(courseId) { mutableListOf() } += EnrollmentWaitlistEntry(
-                courseId,
-                memberId,
-                requestedAt,
-            )
-        }
-
-        override fun pop(courseId: Long): EnrollmentWaitlistEntry? {
-            val queue = entries[courseId] ?: return null
-            val first = queue.removeFirstOrNull()
-            if (queue.isEmpty()) {
-                entries.remove(courseId)
-            }
-            return first
-        }
-
-        override fun remove(
-            courseId: Long,
-            memberId: Long,
-        ) {
-            entries[courseId]?.removeIf { it.memberId == memberId }
-            if (entries[courseId].isNullOrEmpty()) {
-                entries.remove(courseId)
-            }
-        }
-
-        override fun findCourseIds(): Set<Long> = entries.keys
     }
 }
