@@ -1,3 +1,2 @@
 org.yechan.CommonSecurityAutoConfiguration
-org.yechan.CommonSecurityBeanRegistrar
 org.yechan.PasswordEncoderBeanRegistrar
