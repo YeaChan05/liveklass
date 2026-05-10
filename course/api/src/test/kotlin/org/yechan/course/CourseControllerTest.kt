@@ -29,7 +29,6 @@ import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberSecurityAdapterConfiguration
-import java.time.LocalDateTime
 
 @SpringBootTest(
     classes = [
