@@ -219,6 +219,34 @@ class MemberAuthControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun memberAuthService(): FakeMemberAuthService = FakeMemberAuthService()
+
+        @Bean
+        fun memberAuthUseCase(): MemberAuthUseCase = object : MemberAuthUseCase {
+            override fun signup(command: SignupCommand): SignupResult = throw UnsupportedOperationException()
+
+            override fun login(command: LoginCommand): LoginResult = throw UnsupportedOperationException()
+
+            override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = throw UnsupportedOperationException()
+
+            override fun logout(command: LogoutCommand) {
+            }
+
+            override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(
+                id = userId,
+                email = "user$userId@test.com",
+                name = "user$userId",
+                role = MemberRole.CREATOR,
+                status = MemberStatus.ACTIVE,
+            )
+
+            override fun getCurrentUserByEmail(email: String): CurrentMemberResult = CurrentMemberResult(
+                id = email.filter(Char::isDigit).toLongOrNull() ?: 1L,
+                email = email,
+                name = "test-user",
+                role = MemberRole.CREATOR,
+                status = MemberStatus.ACTIVE,
+            )
+        }
     }
 
     class FakeMemberAuthService : MemberAuthUseCase {
@@ -267,5 +295,7 @@ class MemberAuthControllerTest @Autowired constructor(
             role = MemberRole.CLASSMATE,
             status = MemberStatus.ACTIVE,
         )
+
+        override fun getCurrentUserByEmail(email: String): CurrentMemberResult = getCurrentUser(1)
     }
 }

@@ -20,8 +20,18 @@ import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
 import org.yechan.course.CourseAuthorizationPolicy
+import org.yechan.member.CurrentMemberResult
+import org.yechan.member.LoginCommand
+import org.yechan.member.LoginResult
+import org.yechan.member.LogoutCommand
+import org.yechan.member.MemberAuthUseCase
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberSecurityAdapterConfiguration
+import org.yechan.member.MemberStatus
+import org.yechan.member.RefreshTokenCommand
+import org.yechan.member.RefreshTokenResult
+import org.yechan.member.SignupCommand
+import org.yechan.member.SignupResult
 
 @SpringBootTest(
     classes = [
@@ -138,39 +148,67 @@ class EnrollmentControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun enrollmentUseCase(): EnrollmentUseCase = FakeEnrollmentUseCase()
+
+        @Bean
+        fun memberAuthUseCase(): MemberAuthUseCase = object : MemberAuthUseCase {
+            override fun signup(command: SignupCommand): SignupResult = throw UnsupportedOperationException()
+
+            override fun login(command: LoginCommand): LoginResult = throw UnsupportedOperationException()
+
+            override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = throw UnsupportedOperationException()
+
+            override fun logout(command: LogoutCommand) {
+            }
+
+            override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(
+                id = userId,
+                email = "user$userId@test.com",
+                name = "user$userId",
+                role = MemberRole.CREATOR,
+                status = MemberStatus.ACTIVE,
+            )
+
+            override fun getCurrentUserByEmail(email: String): CurrentMemberResult = CurrentMemberResult(
+                id = email.filter(Char::isDigit).toLongOrNull() ?: 1L,
+                email = email,
+                name = "test-user",
+                role = MemberRole.CREATOR,
+                status = MemberStatus.ACTIVE,
+            )
+        }
     }
+}
 
-    class FakeEnrollmentUseCase : EnrollmentUseCase {
-        override fun enroll(command: EnrollCourseCommand): EnrollmentResult = enrollment(
-            memberId = command.memberId,
-            status = EnrollmentStatus.PENDING,
-        )
+class FakeEnrollmentUseCase : EnrollmentUseCase {
+    override fun enroll(command: EnrollCourseCommand): EnrollmentResult = enrollment(
+        memberId = command.memberId,
+        status = EnrollmentStatus.PENDING,
+    )
 
-        override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
-            memberId = command.memberId,
-            status = EnrollmentStatus.CONFIRMED,
-        )
+    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
+        memberId = command.memberId,
+        status = EnrollmentStatus.CONFIRMED,
+    )
 
-        override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
-            memberId = command.memberId,
-            status = EnrollmentStatus.CANCELLED,
-        )
+    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
+        memberId = command.memberId,
+        status = EnrollmentStatus.CANCELLED,
+    )
 
-        override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = listOf(
-            enrollment(
-                memberId = memberId,
-                status = EnrollmentStatus.CANCELLED,
-            ),
-        )
-
-        private fun enrollment(
-            memberId: Long,
-            status: EnrollmentStatus,
-        ) = EnrollmentResult(
-            enrollmentId = 1L,
-            courseId = 1L,
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = listOf(
+        enrollment(
             memberId = memberId,
-            status = status,
-        )
-    }
+            status = EnrollmentStatus.CANCELLED,
+        ),
+    )
+
+    private fun enrollment(
+        memberId: Long,
+        status: EnrollmentStatus,
+    ) = EnrollmentResult(
+        enrollmentId = 1L,
+        courseId = 1L,
+        memberId = memberId,
+        status = status,
+    )
 }

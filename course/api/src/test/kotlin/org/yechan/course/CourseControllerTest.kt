@@ -27,8 +27,18 @@ import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
 import org.yechan.TokenGenerator
+import org.yechan.member.CurrentMemberResult
+import org.yechan.member.LoginCommand
+import org.yechan.member.LoginResult
+import org.yechan.member.LogoutCommand
+import org.yechan.member.MemberAuthUseCase
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberSecurityAdapterConfiguration
+import org.yechan.member.MemberStatus
+import org.yechan.member.RefreshTokenCommand
+import org.yechan.member.RefreshTokenResult
+import org.yechan.member.SignupCommand
+import org.yechan.member.SignupResult
 
 @SpringBootTest(
     classes = [
@@ -380,6 +390,44 @@ class CourseControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun courseUseCase(): FakeCourseUseCase = FakeCourseUseCase()
+
+        @Bean
+        fun memberAuthUseCase(): MemberAuthUseCase = object : MemberAuthUseCase {
+            override fun signup(command: SignupCommand): SignupResult = throw UnsupportedOperationException()
+
+            override fun login(command: LoginCommand): LoginResult = throw UnsupportedOperationException()
+
+            override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = throw UnsupportedOperationException()
+
+            override fun logout(command: LogoutCommand) {
+            }
+
+            override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(
+                id = userId,
+                email = "user$userId@test.com",
+                name = "user$userId",
+                role = roleOf(userId),
+                status = MemberStatus.ACTIVE,
+            )
+
+            override fun getCurrentUserByEmail(email: String): CurrentMemberResult {
+                val userId = email.filter(Char::isDigit).toLongOrNull() ?: 1L
+
+                return CurrentMemberResult(
+                    id = userId,
+                    email = email,
+                    name = "user$userId",
+                    role = roleOf(userId),
+                    status = MemberStatus.ACTIVE,
+                )
+            }
+
+            private fun roleOf(userId: Long): MemberRole = when (userId) {
+                1L, 3L -> MemberRole.CREATOR
+                2L -> MemberRole.CLASSMATE
+                else -> MemberRole.CLASSMATE
+            }
+        }
     }
 
     class FakeCourseUseCase : CourseUseCase {
