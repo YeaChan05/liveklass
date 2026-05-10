@@ -6,9 +6,6 @@ import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseStatus
 import org.yechan.course.EnrollmentNotFoundException
-import org.yechan.member.MemberModel
-import org.yechan.member.MemberNotFoundException
-import org.yechan.member.MemberRepository
 import java.time.Instant
 
 interface EnrollmentUseCase {
@@ -23,21 +20,22 @@ interface EnrollmentUseCase {
 
 @Transactional(readOnly = true)
 class EnrollmentService(
-    private val memberRepository: MemberRepository,
     private val courseRepository: CourseRepository,
     private val enrollmentRepository: EnrollmentRepository,
     private val waitlistRepository: EnrollmentWaitlistRepository,
 ) : EnrollmentUseCase {
     @Transactional
     override fun enroll(command: EnrollCourseCommand): EnrollmentResult {
-        activeMember(command.memberId)
-        val course = courseRepository.findById(command.courseId) ?: throw CourseNotFoundException()
+        val course = courseRepository.findByIdForUpdate(command.courseId)
+            ?: throw CourseNotFoundException()
+
         if (course.status == CourseStatus.OPEN && course.seatLeftCount <= 0) {
             waitlistRepository.enqueue(
                 courseId = command.courseId,
                 memberId = command.memberId,
                 requestedAt = Instant.now(),
             )
+
             throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
         }
 
@@ -45,7 +43,7 @@ class EnrollmentService(
         val savedCourse = courseRepository.save(reservedCourse)
         val enrollment = savedCourse.requestEnrollment(command.memberId)
 
-        return EnrollmentResult.from(enrollmentRepository.save(enrollment, savedCourse.courseId!!))
+        return enrollmentRepository.save(enrollment, savedCourse.courseId!!).toResult()
     }
 
     @Transactional
@@ -58,7 +56,7 @@ class EnrollmentService(
                 throw CourseInvalidStateException(e.message ?: "결제를 확정할 수 없습니다.")
             }
 
-        return EnrollmentResult.from(enrollmentRepository.save(confirmed, enrollment.courseId))
+        return enrollmentRepository.save(confirmed, enrollment.courseId).toResult()
     }
 
     @Transactional
@@ -74,19 +72,10 @@ class EnrollmentService(
             }
         courseRepository.save(course.releaseSeat())
 
-        return EnrollmentResult.from(enrollmentRepository.save(cancelled, enrollment.courseId))
+        return enrollmentRepository.save(cancelled, enrollment.courseId).toResult()
     }
 
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> {
-        activeMember(memberId)
-        return enrollmentRepository.findByMemberId(memberId).map(EnrollmentResult::from)
-    }
-
-    private fun activeMember(memberId: Long): MemberModel {
-        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
-        member.validateMemberStatus()
-        return member
-    }
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
 
     private fun ownedEnrollment(
         enrollmentId: Long,
@@ -95,3 +84,10 @@ class EnrollmentService(
         ?.takeIf { it.memberId == memberId }
         ?: throw EnrollmentNotFoundException()
 }
+
+private fun EnrollmentModel.toResult(): EnrollmentResult = EnrollmentResult(
+    enrollmentId = requireNotNull(enrollmentId),
+    courseId = courseId,
+    memberId = memberId,
+    status = status,
+)

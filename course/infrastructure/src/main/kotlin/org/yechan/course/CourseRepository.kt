@@ -5,5 +5,7 @@ interface CourseRepository {
 
     fun findById(courseId: Long): CourseModel?
 
+    fun findByIdForUpdate(courseId: Long): CourseModel?
+
     fun findAll(): List<CourseModel>
 }

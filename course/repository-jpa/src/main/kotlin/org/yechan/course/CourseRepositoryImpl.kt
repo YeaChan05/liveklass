@@ -8,6 +8,8 @@ class CourseRepositoryImpl(
 
     override fun findById(courseId: Long): CourseModel? = courseJpaRepository.findById(courseId).orElse(null)?.toDomain()
 
+    override fun findByIdForUpdate(courseId: Long): CourseModel? = courseJpaRepository.findByIdForUpdate(courseId)?.toDomain()
+
     override fun findAll(): List<CourseModel> = courseJpaRepository.findAll().map(CourseEntity::toDomain)
 }
 
