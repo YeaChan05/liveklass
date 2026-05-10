@@ -26,19 +26,30 @@ class EnrollmentService(
 ) : EnrollmentUseCase {
     @Transactional
     override fun enroll(command: EnrollCourseCommand): EnrollmentResult {
-        val courseId = command.courseId
         val memberId = command.memberId
+        val courseId = command.courseId
+        if (waitlistRepository.isSoldOut(courseId)) {
+            waitlistRepository.enqueue(
+                courseId = courseId,
+                memberId = memberId,
+                requestedAt = Instant.now(),
+            )
 
-        val course = courseRepository.findById(courseId)
-            ?: throw CourseNotFoundException()
-
-        if (course.status != CourseStatus.OPEN) {
-            throw CourseInvalidStateException("모집 중인 강의만 신청할 수 있습니다.")
+            throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
         }
 
         val reserved = courseRepository.reserveSeatIfAvailable(courseId)
 
         if (!reserved) {
+            val course = courseRepository.findById(courseId)
+                ?: throw CourseNotFoundException()
+
+            if (course.status != CourseStatus.OPEN) {
+                throw CourseInvalidStateException("모집 중인 강의만 신청할 수 있습니다.")
+            }
+
+            waitlistRepository.markSoldOut(courseId)
+
             waitlistRepository.enqueue(
                 courseId = courseId,
                 memberId = memberId,
@@ -89,6 +100,8 @@ class EnrollmentService(
         if (!released) {
             throw CourseInvalidStateException("좌석을 반환할 수 없습니다.")
         }
+
+        waitlistRepository.clearSoldOut(enrollment.courseId)
 
         return savedEnrollment.toResult()
     }
