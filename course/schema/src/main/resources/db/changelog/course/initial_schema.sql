@@ -44,6 +44,9 @@ CREATE TABLE enrollments (
     created_at DATETIME(6) NULL,
     updated_at DATETIME(6) NULL,
 
+    payment_pending_start_at DATETIME(6) NULL,
+    payment_pending_end_at DATETIME(6) NULL,
+
     CONSTRAINT pk_enrollments
         PRIMARY KEY (id),
 
