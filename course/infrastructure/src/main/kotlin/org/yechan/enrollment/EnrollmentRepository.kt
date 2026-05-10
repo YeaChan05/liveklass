@@ -1,6 +1,7 @@
 package org.yechan.enrollment
 
 import java.time.Instant
+import java.time.LocalDateTime
 
 interface EnrollmentRepository {
     fun save(enrollment: EnrollmentModel, courseId: Long): EnrollmentModel
@@ -8,6 +9,16 @@ interface EnrollmentRepository {
     fun findById(enrollmentId: Long): EnrollmentModel?
 
     fun findByMemberId(memberId: Long): List<EnrollmentModel>
+
+    fun findExpiredPaymentPendingTargets(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<EnrollmentExpirationTarget>
+
+    fun expirePaymentPendingIfExpired(
+        enrollmentId: Long,
+        now: LocalDateTime,
+    ): Boolean
 }
 
 interface EnrollmentWaitlistRepository {
@@ -37,4 +48,9 @@ data class EnrollmentWaitlistEntry(
     val courseId: Long,
     val memberId: Long,
     val requestedAt: Instant,
+)
+
+data class EnrollmentExpirationTarget(
+    val enrollmentId: Long,
+    val courseId: Long,
 )

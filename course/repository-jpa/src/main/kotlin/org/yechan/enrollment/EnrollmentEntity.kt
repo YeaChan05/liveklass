@@ -8,6 +8,7 @@ import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.yechan.BaseEntity
+import java.time.LocalDateTime
 
 @Entity
 @Table(
@@ -27,19 +28,28 @@ import org.yechan.BaseEntity
             name = "idx_enrollments_course_status",
             columnList = "course_id, status",
         ),
+        Index(
+            name = "idx_enrollments_status_payment_pending_expires_at",
+            columnList = "status, payment_pending_expires_at",
+        ),
     ],
 )
 class EnrollmentEntity private constructor(
-    @field:Column(nullable = false)
+    @field:Column(name = "course_id", nullable = false)
     override var courseId: Long,
 
-    @field:Column(nullable = false)
+    @field:Column(name = "member_id", nullable = false)
     override var memberId: Long,
 
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
     override var status: EnrollmentStatus,
 
+    @field:Column(name = "payment_pending_started_at", nullable = false)
+    override var paymentPendingStartedAt: LocalDateTime,
+
+    @field:Column(name = "payment_pending_expires_at", nullable = false)
+    override var paymentPendingExpiresAt: LocalDateTime,
 ) : BaseEntity(),
     EnrollmentModel {
     override val enrollmentId: Long?
@@ -53,6 +63,8 @@ class EnrollmentEntity private constructor(
             courseId = courseId,
             memberId = enrollment.memberId,
             status = enrollment.status,
+            paymentPendingStartedAt = enrollment.paymentPendingStartedAt,
+            paymentPendingExpiresAt = enrollment.paymentPendingExpiresAt,
         ).apply {
             assignId(enrollment.enrollmentId)
         }
@@ -63,6 +75,8 @@ class EnrollmentEntity private constructor(
         courseId = courseId,
         memberId = memberId,
         status = status,
+        paymentPendingStartedAt = paymentPendingStartedAt,
+        paymentPendingExpiresAt = paymentPendingExpiresAt,
     )
 
     private fun assignId(id: Long?) {
