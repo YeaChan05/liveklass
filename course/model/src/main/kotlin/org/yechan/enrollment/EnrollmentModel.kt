@@ -38,8 +38,8 @@ data class EnrollmentModelData(
     override fun confirmPayment(): EnrollmentModel = confirm()
 
     override fun cancel(): EnrollmentModel {
-        if (status == EnrollmentStatus.CANCELLED) {
-            throw CourseInvalidStateException("이미 취소된 신청입니다.")
+        if (status != EnrollmentStatus.PENDING) {
+            throw CourseInvalidStateException("결제 대기 상태에서만 취소가 가능합니다.")
         }
         return copy(status = EnrollmentStatus.CANCELLED)
     }

@@ -60,7 +60,7 @@ class EnrollmentModelTest {
         val cancelled = enrollment().cancel()
 
         val exception = assertThrows(CourseInvalidStateException::class.java) { cancelled.cancel() }
-        assertEquals("이미 취소된 신청입니다.", exception.message)
+        assertEquals("결제 대기 상태에서만 취소가 가능합니다.", exception.message)
     }
 
     private fun enrollment() = EnrollmentModelData(
