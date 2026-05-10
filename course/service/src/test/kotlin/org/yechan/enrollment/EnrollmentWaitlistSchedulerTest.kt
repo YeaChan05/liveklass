@@ -114,9 +114,11 @@ class EnrollmentWaitlistSchedulerTest {
 
         override fun findById(courseId: Long): CourseModel? = courses[courseId]
 
-        override fun findByIdForUpdate(courseId: Long): CourseModel? = courses[courseId]
-
         override fun findAll(): List<CourseModel> = courses.values.toList()
+
+        override fun reserveSeatIfAvailable(courseId: Long): Boolean = courses[courseId]?.let { it.seatLeftCount > 0 } ?: false
+
+        override fun releaseSeatIfPossible(courseId: Long): Boolean = courses[courseId]?.let { it.seatLeftCount < it.capacity } ?: false
     }
 
     private class FakeEnrollmentRepository : EnrollmentRepository {

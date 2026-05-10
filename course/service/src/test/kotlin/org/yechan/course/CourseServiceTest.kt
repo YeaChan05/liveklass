@@ -3,10 +3,10 @@ package org.yechan.course
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
-import org.yechan.member.MemberModel
+import org.yechan.FakeCourseRepository
+import org.yechan.FakeMemberRepository
 import org.yechan.member.MemberModelData
 import org.yechan.member.MemberNotFoundException
-import org.yechan.member.MemberRepository
 import org.yechan.member.MemberRole
 import java.time.LocalDateTime
 
@@ -308,51 +308,4 @@ class CourseServiceTest {
         name = "user$id",
         role = role,
     )
-}
-
-private class FakeMemberRepository : MemberRepository {
-    private val members = linkedMapOf<Long, MemberModel>()
-
-    override fun save(member: MemberModel): MemberModel {
-        members[requireNotNull(member.memberId)] = member
-        return member
-    }
-
-    override fun existsByEmail(email: String): Boolean = members.values.any { it.email == email }
-
-    override fun findByEmail(email: String): MemberModel? = members.values.firstOrNull { it.email == email }
-
-    override fun findById(id: Long): MemberModel? = members[id]
-}
-
-private class FakeCourseRepository : CourseRepository {
-    private val courses = linkedMapOf<Long, CourseModel>()
-    private var nextId = 1L
-
-    override fun save(course: CourseModel): CourseModel {
-        val saved = if (course.courseId == null) {
-            CourseModelData(
-                courseId = nextId++,
-                creatorId = course.creatorId,
-                title = course.title,
-                description = course.description,
-                price = course.price,
-                capacity = course.capacity,
-                seatLeftCount = course.seatLeftCount,
-                periodStart = course.periodStart,
-                periodEnd = course.periodEnd,
-                status = course.status,
-            )
-        } else {
-            course
-        }
-        courses[requireNotNull(saved.courseId)] = saved
-        return saved
-    }
-
-    override fun findById(courseId: Long): CourseModel? = courses[courseId]
-
-    override fun findByIdForUpdate(courseId: Long): CourseModel? = courses[courseId]
-
-    override fun findAll(): List<CourseModel> = courses.values.toList()
 }
