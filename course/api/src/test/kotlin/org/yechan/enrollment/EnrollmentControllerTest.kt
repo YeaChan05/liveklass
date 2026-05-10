@@ -85,7 +85,7 @@ class EnrollmentControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `크리에이터도 수강 신청 API를 사용할 수 있다`() {
+    fun `CREATOR도 수강 신청 API를 사용할 수 있다`() {
         val accessToken =
             tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
 
