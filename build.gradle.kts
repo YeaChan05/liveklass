@@ -230,13 +230,14 @@ subprojects {
 }
 val jacocoExcludes = listOf(
     "**/*Application*",
-    "**/model/**",
     "**/*Dtos*",
+    "**/*Config*",
     "**/*Request*",
     "**/*Response*",
+    "**/model/**",
     "**/exception/**",
     "**/generated/**",
-    "**/*Config*",
+    "**/config/**",
 )
 
 fun Project.jacocoMainClassDirectories() = fileTree(layout.buildDirectory.dir("classes/kotlin/main")) {
