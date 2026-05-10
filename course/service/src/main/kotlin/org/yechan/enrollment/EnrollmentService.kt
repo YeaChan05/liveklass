@@ -26,24 +26,36 @@ class EnrollmentService(
 ) : EnrollmentUseCase {
     @Transactional
     override fun enroll(command: EnrollCourseCommand): EnrollmentResult {
-        val course = courseRepository.findByIdForUpdate(command.courseId)
+        val courseId = command.courseId
+        val memberId = command.memberId
+
+        val course = courseRepository.findById(courseId)
             ?: throw CourseNotFoundException()
 
-        if (course.status == CourseStatus.OPEN && course.seatLeftCount <= 0) {
+        if (course.status != CourseStatus.OPEN) {
+            throw CourseInvalidStateException("모집 중인 강의만 신청할 수 있습니다.")
+        }
+
+        val reserved = courseRepository.reserveSeatIfAvailable(courseId)
+
+        if (!reserved) {
             waitlistRepository.enqueue(
-                courseId = command.courseId,
-                memberId = command.memberId,
+                courseId = courseId,
+                memberId = memberId,
                 requestedAt = Instant.now(),
             )
 
             throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
         }
 
-        val reservedCourse = course.reserveSeat()
-        val savedCourse = courseRepository.save(reservedCourse)
-        val enrollment = savedCourse.requestEnrollment(command.memberId)
+        val enrollment = EnrollmentModelData(
+            enrollmentId = null,
+            courseId = courseId,
+            memberId = memberId,
+            status = EnrollmentStatus.PENDING,
+        )
 
-        return enrollmentRepository.save(enrollment, savedCourse.courseId!!).toResult()
+        return enrollmentRepository.save(enrollment, courseId).toResult()
     }
 
     @Transactional
@@ -56,23 +68,29 @@ class EnrollmentService(
                 throw CourseInvalidStateException(e.message ?: "결제를 확정할 수 없습니다.")
             }
 
-        return enrollmentRepository.save(confirmed, enrollment.courseId).toResult()
+        return enrollmentRepository.save(confirmed, confirmed.courseId).toResult()
     }
 
     @Transactional
     override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
-        val course =
-            courseRepository.findById(enrollment.courseId) ?: throw CourseNotFoundException()
+
         val cancelled =
             try {
                 enrollment.cancel()
             } catch (e: IllegalStateException) {
                 throw CourseInvalidStateException(e.message ?: "수강 신청을 취소할 수 없습니다.")
             }
-        courseRepository.save(course.releaseSeat())
 
-        return enrollmentRepository.save(cancelled, enrollment.courseId).toResult()
+        val savedEnrollment = enrollmentRepository.save(cancelled, enrollment.courseId)
+
+        val released = courseRepository.releaseSeatIfPossible(enrollment.courseId)
+
+        if (!released) {
+            throw CourseInvalidStateException("좌석을 반환할 수 없습니다.")
+        }
+
+        return savedEnrollment.toResult()
     }
 
     override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
