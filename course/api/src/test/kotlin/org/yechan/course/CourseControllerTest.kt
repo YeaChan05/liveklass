@@ -1,6 +1,7 @@
 package org.yechan.course
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.getBean
@@ -48,34 +49,20 @@ class CourseControllerTest @Autowired constructor(
     private val tokenGenerator: TokenGenerator,
     private val context: ApplicationContext,
 ) {
+    @BeforeEach
+    fun setUp() {
+        context.getBean<FakeCourseUseCase>().reset()
+    }
+
     @Test
     fun `강의 등록 모집 시작 마감 목록 상세 API를 제공한다`() {
         val accessToken =
             tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
 
-        restTestClient.post()
-            .uri("/api/courses")
-            .header("X-API-Version", "v1")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(
-                """
-                {
-                  "title": "Kotlin Basic",
-                  "description": "Kotlin course",
-                  "price": 100000,
-                  "capacity": 2,
-                  "periodStart": "2026-06-01T00:00:00",
-                  "periodEnd": "2026-06-30T00:00:00"
-                }
-                """.trimIndent(),
-            )
-            .exchange()
-            .expectStatus().isOk
-            .expectBody()
-            .jsonPath("$.capacity").isEqualTo(2)
-            .jsonPath("$.seatLeftCount").isEqualTo(2)
-            .jsonPath("$.status").isEqualTo("DRAFT")
+        createCourse(
+            accessToken = accessToken,
+            title = "Kotlin Basic",
+        )
 
         restTestClient.post()
             .uri("/api/courses/1/open")
@@ -84,6 +71,11 @@ class CourseControllerTest @Autowired constructor(
             .exchange()
             .expectStatus().isOk
             .expectBody()
+            .jsonPath("$.courseId").isEqualTo(1)
+            .jsonPath("$.title").isEqualTo("Kotlin Basic")
+            .jsonPath("$.capacity").isEqualTo(2)
+            .jsonPath("$.seatLeftCount").isEqualTo(2)
+            .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
             .jsonPath("$.status").isEqualTo("OPEN")
 
         restTestClient.post()
@@ -93,6 +85,11 @@ class CourseControllerTest @Autowired constructor(
             .exchange()
             .expectStatus().isOk
             .expectBody()
+            .jsonPath("$.courseId").isEqualTo(1)
+            .jsonPath("$.title").isEqualTo("Kotlin Basic")
+            .jsonPath("$.capacity").isEqualTo(2)
+            .jsonPath("$.seatLeftCount").isEqualTo(2)
+            .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
             .jsonPath("$.status").isEqualTo("CLOSED")
 
         restTestClient.get()
@@ -101,18 +98,23 @@ class CourseControllerTest @Autowired constructor(
             .exchange()
             .expectStatus().isOk
             .expectBody()
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$[0].courseId").isEqualTo(1)
+            .jsonPath("$[0].title").isEqualTo("Kotlin Basic")
             .jsonPath("$[0].capacity").isEqualTo(2)
-            .jsonPath("$[0].seatLeftCount").isEqualTo(1)
-            .jsonPath("$[0].currentEnrollmentCount").isEqualTo(1)
+            .jsonPath("$[0].seatLeftCount").isEqualTo(2)
+            .jsonPath("$[0].currentEnrollmentCount").isEqualTo(0)
+            .jsonPath("$[0].status").isEqualTo("CLOSED")
 
         restTestClient.get()
-            .uri("/api/courses?status=OPEN")
+            .uri("/api/courses?status=CLOSED")
             .header("X-API-Version", "v1")
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$[0].status").isEqualTo("OPEN")
-            .jsonPath("$[0].currentEnrollmentCount").isEqualTo(1)
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$[0].courseId").isEqualTo(1)
+            .jsonPath("$[0].status").isEqualTo("CLOSED")
 
         restTestClient.get()
             .uri("/api/courses/1")
@@ -120,9 +122,84 @@ class CourseControllerTest @Autowired constructor(
             .exchange()
             .expectStatus().isOk
             .expectBody()
+            .jsonPath("$.courseId").isEqualTo(1)
+            .jsonPath("$.title").isEqualTo("Kotlin Basic")
             .jsonPath("$.capacity").isEqualTo(2)
-            .jsonPath("$.seatLeftCount").isEqualTo(1)
-            .jsonPath("$.currentEnrollmentCount").isEqualTo(1)
+            .jsonPath("$.seatLeftCount").isEqualTo(2)
+            .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
+            .jsonPath("$.status").isEqualTo("CLOSED")
+    }
+
+    @Test
+    fun `강의 목록 조회는 상태 파라미터가 없으면 전체 강의를 조회한다`() {
+        val accessToken =
+            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+
+        createCourse(accessToken = accessToken, title = "Draft Course")
+        createCourse(accessToken = accessToken, title = "Open Course")
+        createCourse(accessToken = accessToken, title = "Closed Course")
+
+        openCourse(accessToken = accessToken, courseId = 2L)
+        openCourse(accessToken = accessToken, courseId = 3L)
+        closeCourse(accessToken = accessToken, courseId = 3L)
+
+        restTestClient.get()
+            .uri("/api/courses")
+            .header("X-API-Version", "v1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(3)
+            .jsonPath("$[0].title").isEqualTo("Draft Course")
+            .jsonPath("$[0].status").isEqualTo("DRAFT")
+            .jsonPath("$[1].title").isEqualTo("Open Course")
+            .jsonPath("$[1].status").isEqualTo("OPEN")
+            .jsonPath("$[2].title").isEqualTo("Closed Course")
+            .jsonPath("$[2].status").isEqualTo("CLOSED")
+    }
+
+    @Test
+    fun `강의 목록 조회는 상태 파라미터로 필터링할 수 있다`() {
+        val accessToken =
+            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+
+        createCourse(accessToken = accessToken, title = "Draft Course")
+        createCourse(accessToken = accessToken, title = "Open Course")
+        createCourse(accessToken = accessToken, title = "Closed Course")
+
+        openCourse(accessToken = accessToken, courseId = 2L)
+        openCourse(accessToken = accessToken, courseId = 3L)
+        closeCourse(accessToken = accessToken, courseId = 3L)
+
+        restTestClient.get()
+            .uri("/api/courses?status=DRAFT")
+            .header("X-API-Version", "v1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$[0].title").isEqualTo("Draft Course")
+            .jsonPath("$[0].status").isEqualTo("DRAFT")
+
+        restTestClient.get()
+            .uri("/api/courses?status=OPEN")
+            .header("X-API-Version", "v1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$[0].title").isEqualTo("Open Course")
+            .jsonPath("$[0].status").isEqualTo("OPEN")
+
+        restTestClient.get()
+            .uri("/api/courses?status=CLOSED")
+            .header("X-API-Version", "v1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$[0].title").isEqualTo("Closed Course")
+            .jsonPath("$[0].status").isEqualTo("CLOSED")
     }
 
     @Test
@@ -142,8 +219,8 @@ class CourseControllerTest @Autowired constructor(
                   "description": "Kotlin course",
                   "price": 100000,
                   "capacity": 2,
-                  "periodStart": "2026-06-01T00:00:00",
-                  "periodEnd": "2026-06-30T00:00:00"
+                  "periodStart": "2099-06-01T00:00:00",
+                  "periodEnd": "2099-06-30T00:00:00"
                 }
                 """.trimIndent(),
             )
@@ -178,8 +255,8 @@ class CourseControllerTest @Autowired constructor(
                   "description": "Kotlin course",
                   "price": 100000,
                   "capacity": 2,
-                  "periodStart": "2026-06-01T00:00:00",
-                  "periodEnd": "2026-06-30T00:00:00"
+                  "periodStart": "2099-06-01T00:00:00",
+                  "periodEnd": "2099-06-30T00:00:00"
                 }
                 """.trimIndent(),
             )
@@ -205,6 +282,17 @@ class CourseControllerTest @Autowired constructor(
         val accessToken =
             tokenGenerator.generate(3L, roles = setOf(MemberRole.CREATOR.name)).accessToken
 
+        createCourse(
+            accessToken = accessToken,
+            title = "Kotlin Basic",
+        )
+    }
+
+    private fun createCourse(
+        accessToken: String,
+        title: String,
+        capacity: Int = 2,
+    ) {
         restTestClient.post()
             .uri("/api/courses")
             .header("X-API-Version", "v1")
@@ -213,17 +301,53 @@ class CourseControllerTest @Autowired constructor(
             .body(
                 """
                 {
-                  "title": "Kotlin Basic",
-                  "description": "Kotlin course",
+                  "title": "$title",
+                  "description": "$title description",
                   "price": 100000,
-                  "capacity": 2,
-                  "periodStart": "2026-06-01T00:00:00",
-                  "periodEnd": "2026-06-30T00:00:00"
+                  "capacity": $capacity,
+                  "periodStart": "2099-06-01T00:00:00",
+                  "periodEnd": "2099-06-30T00:00:00"
                 }
                 """.trimIndent(),
             )
             .exchange()
             .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.title").isEqualTo(title)
+            .jsonPath("$.capacity").isEqualTo(capacity)
+            .jsonPath("$.seatLeftCount").isEqualTo(capacity)
+            .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
+            .jsonPath("$.status").isEqualTo("DRAFT")
+    }
+
+    private fun openCourse(
+        accessToken: String,
+        courseId: Long,
+    ) {
+        restTestClient.post()
+            .uri("/api/courses/$courseId/open")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.courseId").isEqualTo(courseId)
+            .jsonPath("$.status").isEqualTo("OPEN")
+    }
+
+    private fun closeCourse(
+        accessToken: String,
+        courseId: Long,
+    ) {
+        restTestClient.post()
+            .uri("/api/courses/$courseId/close")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.courseId").isEqualTo(courseId)
+            .jsonPath("$.status").isEqualTo("CLOSED")
     }
 
     @SpringBootConfiguration
@@ -248,6 +372,7 @@ class CourseControllerTest @Autowired constructor(
                 MockMvcBuilders.webAppContextSetup(context)
                     .apply<DefaultMockMvcBuilder>(SecurityMockMvcConfigurers.springSecurity())
                     .build()
+
             return RestTestClient.bindTo(mockMvc)
                 .apiVersionInserter(ApiVersionInserter.useHeader("X-API-Version"))
                 .build()
@@ -255,45 +380,83 @@ class CourseControllerTest @Autowired constructor(
 
         @Bean
         @Primary
-        fun courseUseCase(): CourseUseCase = FakeCourseUseCase()
+        fun courseUseCase(): FakeCourseUseCase = FakeCourseUseCase()
     }
 
     class FakeCourseUseCase : CourseUseCase {
-        override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult = course(status = CourseStatus.DRAFT)
+        private val courses = linkedMapOf<Long, CourseResult>()
+        private var sequence = 1L
 
-        override fun openCourse(command: CourseStatusCommand): CourseResult = course(status = CourseStatus.OPEN)
-
-        override fun closeCourse(command: CourseStatusCommand): CourseResult = course(status = CourseStatus.CLOSED)
-
-        override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
-            CourseStatus.OPEN -> listOf(course(status = CourseStatus.OPEN, seatLeftCount = 1))
-
-            CourseStatus.CLOSED -> listOf(course(status = CourseStatus.CLOSED, seatLeftCount = 1))
-
-            CourseStatus.DRAFT -> listOf(course(status = CourseStatus.DRAFT))
-
-            null -> listOf(
-                course(status = CourseStatus.OPEN, seatLeftCount = 1),
-                course(status = CourseStatus.CLOSED, seatLeftCount = 1),
-            )
+        fun reset() {
+            courses.clear()
+            sequence = 1L
         }
 
-        override fun getCourse(courseId: Long): CourseResult = course(status = CourseStatus.CLOSED, seatLeftCount = 1)
+        override fun createCourse(
+            command: CreateCourseCommand,
+            creatorId: Long,
+        ): CourseResult {
+            val courseId = sequence++
 
-        private fun course(
-            status: CourseStatus,
-            seatLeftCount: Int = 2,
-        ) = CourseResult(
-            courseId = 1L,
-            creatorId = 1L,
-            title = "Kotlin Basic",
-            description = "Kotlin course",
-            price = Money(100_000L),
-            capacity = 2,
+            val course =
+                CourseResult(
+                    courseId = courseId,
+                    creatorId = creatorId,
+                    title = command.title,
+                    description = command.description,
+                    price = command.price,
+                    capacity = command.capacity,
+                    seatLeftCount = command.capacity,
+                    currentEnrollmentCount = 0,
+                    periodStart = command.periodStart,
+                    periodEnd = command.periodEnd,
+                    status = CourseStatus.DRAFT,
+                )
+
+            courses[courseId] = course
+
+            return course
+        }
+
+        override fun openCourse(command: CourseStatusCommand): CourseResult {
+            val course = findCourse(command.courseId)
+
+            val opened = course.withStatus(CourseStatus.OPEN)
+
+            courses[command.courseId] = opened
+
+            return opened
+        }
+
+        override fun closeCourse(command: CourseStatusCommand): CourseResult {
+            val course = findCourse(command.courseId)
+
+            val closed = course.withStatus(CourseStatus.CLOSED)
+
+            courses[command.courseId] = closed
+
+            return closed
+        }
+
+        override fun getCourses(status: CourseStatus?): List<CourseResult> = courses.values
+            .filter { course -> status == null || course.status == status }
+
+        override fun getCourse(courseId: Long): CourseResult = findCourse(courseId)
+
+        private fun findCourse(courseId: Long): CourseResult = courses[courseId]
+            ?: throw IllegalArgumentException("강의를 찾을 수 없습니다.")
+
+        private fun CourseResult.withStatus(status: CourseStatus): CourseResult = CourseResult(
+            courseId = courseId,
+            creatorId = creatorId,
+            title = title,
+            description = description,
+            price = price,
+            capacity = capacity,
             seatLeftCount = seatLeftCount,
-            currentEnrollmentCount = 2 - seatLeftCount,
-            periodStart = LocalDateTime.of(2026, 6, 1, 0, 0),
-            periodEnd = LocalDateTime.of(2026, 6, 30, 0, 0),
+            currentEnrollmentCount = currentEnrollmentCount,
+            periodStart = periodStart,
+            periodEnd = periodEnd,
             status = status,
         )
     }
