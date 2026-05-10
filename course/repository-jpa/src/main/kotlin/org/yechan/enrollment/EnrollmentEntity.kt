@@ -6,7 +6,6 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import org.yechan.BaseEntity
-import org.yechan.course.CourseInvalidStateException
 
 @Entity
 @Table(name = "enrollments")
@@ -37,24 +36,6 @@ class EnrollmentEntity private constructor(
         ).apply {
             assignId(enrollment.enrollmentId)
         }
-    }
-
-    override fun confirm(): EnrollmentModel {
-        if (status != EnrollmentStatus.PENDING) {
-            throw CourseInvalidStateException("결제 대기 상태의 신청만 확정할 수 있습니다.")
-        }
-        status = EnrollmentStatus.CONFIRMED
-        return this
-    }
-
-    override fun confirmPayment(): EnrollmentModel = confirm()
-
-    override fun cancel(): EnrollmentModel {
-        if (status == EnrollmentStatus.CANCELLED) {
-            throw CourseInvalidStateException("이미 취소된 신청입니다.")
-        }
-        status = EnrollmentStatus.CANCELLED
-        return this
     }
 
     fun toDomain(): EnrollmentModel = EnrollmentModelData(
