@@ -26,24 +26,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
+import org.yechan.TestMemberAuthUseCaseConfiguration
 import org.yechan.TokenGenerator
-import org.yechan.member.CurrentMemberResult
-import org.yechan.member.LoginCommand
-import org.yechan.member.LoginResult
-import org.yechan.member.LogoutCommand
-import org.yechan.member.MemberAuthUseCase
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberSecurityAdapterConfiguration
-import org.yechan.member.MemberStatus
-import org.yechan.member.RefreshTokenCommand
-import org.yechan.member.RefreshTokenResult
-import org.yechan.member.SignupCommand
-import org.yechan.member.SignupResult
 
 @SpringBootTest(
     classes = [
         CourseControllerTest.TestApplication::class,
         CourseControllerTest.TestBeans::class,
+        TestMemberAuthUseCaseConfiguration::class,
+
     ],
 )
 @TestPropertySource(
@@ -60,7 +53,7 @@ class CourseControllerTest @Autowired constructor(
 ) {
     @BeforeEach
     fun setUp() {
-        context.getBean<FakeCourseUseCase>().reset()
+        context.getBean<TestBeans.FakeCourseUseCase>().reset()
     }
 
     @Test
@@ -391,120 +384,82 @@ class CourseControllerTest @Autowired constructor(
         @Primary
         fun courseUseCase(): FakeCourseUseCase = FakeCourseUseCase()
 
-        @Bean
-        fun memberAuthUseCase(): MemberAuthUseCase = object : MemberAuthUseCase {
-            override fun signup(command: SignupCommand): SignupResult = throw UnsupportedOperationException()
+        class FakeCourseUseCase : CourseUseCase {
+            private val courses = linkedMapOf<Long, CourseResult>()
+            private var sequence = 1L
 
-            override fun login(command: LoginCommand): LoginResult = throw UnsupportedOperationException()
-
-            override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = throw UnsupportedOperationException()
-
-            override fun logout(command: LogoutCommand) {
+            fun reset() {
+                courses.clear()
+                sequence = 1L
             }
 
-            override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(
-                id = userId,
-                email = "user$userId@test.com",
-                name = "user$userId",
-                role = roleOf(userId),
-                status = MemberStatus.ACTIVE,
+            override fun createCourse(
+                command: CreateCourseCommand,
+                creatorId: Long,
+            ): CourseResult {
+                val courseId = sequence++
+
+                val course =
+                    CourseResult(
+                        courseId = courseId,
+                        creatorId = creatorId,
+                        title = command.title,
+                        description = command.description,
+                        price = command.price,
+                        capacity = command.capacity,
+                        seatLeftCount = command.capacity,
+                        currentEnrollmentCount = 0,
+                        periodStart = command.periodStart,
+                        periodEnd = command.periodEnd,
+                        status = CourseStatus.DRAFT,
+                    )
+
+                courses[courseId] = course
+
+                return course
+            }
+
+            override fun openCourse(command: CourseStatusCommand): CourseResult {
+                val course = findCourse(command.courseId)
+
+                val opened = course.withStatus(CourseStatus.OPEN)
+
+                courses[command.courseId] = opened
+
+                return opened
+            }
+
+            override fun closeCourse(command: CourseStatusCommand): CourseResult {
+                val course = findCourse(command.courseId)
+
+                val closed = course.withStatus(CourseStatus.CLOSED)
+
+                courses[command.courseId] = closed
+
+                return closed
+            }
+
+            override fun getCourses(status: CourseStatus?): List<CourseResult> = courses.values
+                .filter { course -> status == null || course.status == status }
+
+            override fun getCourse(courseId: Long): CourseResult = findCourse(courseId)
+
+            private fun findCourse(courseId: Long): CourseResult = courses[courseId]
+                ?: throw IllegalArgumentException("강의를 찾을 수 없습니다.")
+
+            private fun CourseResult.withStatus(status: CourseStatus): CourseResult = CourseResult(
+                courseId = courseId,
+                creatorId = creatorId,
+                title = title,
+                description = description,
+                price = price,
+                capacity = capacity,
+                seatLeftCount = seatLeftCount,
+                currentEnrollmentCount = currentEnrollmentCount,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+                status = status,
             )
-
-            override fun getCurrentUserByEmail(email: String): CurrentMemberResult {
-                val userId = email.filter(Char::isDigit).toLongOrNull() ?: 1L
-
-                return CurrentMemberResult(
-                    id = userId,
-                    email = email,
-                    name = "user$userId",
-                    role = roleOf(userId),
-                    status = MemberStatus.ACTIVE,
-                )
-            }
-
-            private fun roleOf(userId: Long): MemberRole = when (userId) {
-                1L, 3L -> MemberRole.CREATOR
-                2L -> MemberRole.CLASSMATE
-                else -> MemberRole.CLASSMATE
-            }
         }
-    }
-
-    class FakeCourseUseCase : CourseUseCase {
-        private val courses = linkedMapOf<Long, CourseResult>()
-        private var sequence = 1L
-
-        fun reset() {
-            courses.clear()
-            sequence = 1L
-        }
-
-        override fun createCourse(
-            command: CreateCourseCommand,
-            creatorId: Long,
-        ): CourseResult {
-            val courseId = sequence++
-
-            val course =
-                CourseResult(
-                    courseId = courseId,
-                    creatorId = creatorId,
-                    title = command.title,
-                    description = command.description,
-                    price = command.price,
-                    capacity = command.capacity,
-                    seatLeftCount = command.capacity,
-                    currentEnrollmentCount = 0,
-                    periodStart = command.periodStart,
-                    periodEnd = command.periodEnd,
-                    status = CourseStatus.DRAFT,
-                )
-
-            courses[courseId] = course
-
-            return course
-        }
-
-        override fun openCourse(command: CourseStatusCommand): CourseResult {
-            val course = findCourse(command.courseId)
-
-            val opened = course.withStatus(CourseStatus.OPEN)
-
-            courses[command.courseId] = opened
-
-            return opened
-        }
-
-        override fun closeCourse(command: CourseStatusCommand): CourseResult {
-            val course = findCourse(command.courseId)
-
-            val closed = course.withStatus(CourseStatus.CLOSED)
-
-            courses[command.courseId] = closed
-
-            return closed
-        }
-
-        override fun getCourses(status: CourseStatus?): List<CourseResult> = courses.values
-            .filter { course -> status == null || course.status == status }
-
-        override fun getCourse(courseId: Long): CourseResult = findCourse(courseId)
-
-        private fun findCourse(courseId: Long): CourseResult = courses[courseId]
-            ?: throw IllegalArgumentException("강의를 찾을 수 없습니다.")
-
-        private fun CourseResult.withStatus(status: CourseStatus): CourseResult = CourseResult(
-            courseId = courseId,
-            creatorId = creatorId,
-            title = title,
-            description = description,
-            price = price,
-            capacity = capacity,
-            seatLeftCount = seatLeftCount,
-            currentEnrollmentCount = currentEnrollmentCount,
-            periodStart = periodStart,
-            periodEnd = periodEnd,
-            status = status,
-        )
     }
 }

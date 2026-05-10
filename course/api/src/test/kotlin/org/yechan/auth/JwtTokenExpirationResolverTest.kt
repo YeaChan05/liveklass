@@ -84,7 +84,13 @@ class JwtTokenExpirationResolverTest {
         // Arrange
         val tokenWithoutExpiration = Jwts.builder()
             .subject("1")
-            .signWith(Keys.hmacShaKeyFor(("member-token-secret-member-token-secret$salt").toByteArray(StandardCharsets.UTF_8)))
+            .signWith(
+                Keys.hmacShaKeyFor(
+                    ("member-token-secret-member-token-secret$salt").toByteArray(
+                        StandardCharsets.UTF_8,
+                    ),
+                ),
+            )
             .compact()
         val resolver = JwtTokenExpirationResolver(salt)
 

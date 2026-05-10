@@ -18,25 +18,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
 import org.springframework.web.context.WebApplicationContext
 import org.yechan.ServiceAutoConfiguration
+import org.yechan.TestMemberAuthUseCaseConfiguration
 import org.yechan.TokenGenerator
 import org.yechan.course.CourseAuthorizationPolicy
-import org.yechan.member.CurrentMemberResult
-import org.yechan.member.LoginCommand
-import org.yechan.member.LoginResult
-import org.yechan.member.LogoutCommand
-import org.yechan.member.MemberAuthUseCase
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberSecurityAdapterConfiguration
-import org.yechan.member.MemberStatus
-import org.yechan.member.RefreshTokenCommand
-import org.yechan.member.RefreshTokenResult
-import org.yechan.member.SignupCommand
-import org.yechan.member.SignupResult
 
 @SpringBootTest(
     classes = [
         EnrollmentControllerTest.TestApplication::class,
         EnrollmentControllerTest.TestBeans::class,
+        TestMemberAuthUseCaseConfiguration::class,
     ],
 )
 @TestPropertySource(
@@ -148,34 +140,6 @@ class EnrollmentControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun enrollmentUseCase(): EnrollmentUseCase = FakeEnrollmentUseCase()
-
-        @Bean
-        fun memberAuthUseCase(): MemberAuthUseCase = object : MemberAuthUseCase {
-            override fun signup(command: SignupCommand): SignupResult = throw UnsupportedOperationException()
-
-            override fun login(command: LoginCommand): LoginResult = throw UnsupportedOperationException()
-
-            override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = throw UnsupportedOperationException()
-
-            override fun logout(command: LogoutCommand) {
-            }
-
-            override fun getCurrentUser(userId: Long): CurrentMemberResult = CurrentMemberResult(
-                id = userId,
-                email = "user$userId@test.com",
-                name = "user$userId",
-                role = MemberRole.CREATOR,
-                status = MemberStatus.ACTIVE,
-            )
-
-            override fun getCurrentUserByEmail(email: String): CurrentMemberResult = CurrentMemberResult(
-                id = email.filter(Char::isDigit).toLongOrNull() ?: 1L,
-                email = email,
-                name = "test-user",
-                role = MemberRole.CREATOR,
-                status = MemberStatus.ACTIVE,
-            )
-        }
     }
 }
 
