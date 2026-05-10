@@ -139,6 +139,7 @@ class FakeEnrollmentRepository : EnrollmentRepository {
 
 class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
     private val entries = linkedMapOf<Long, MutableList<EnrollmentWaitlistEntry>>()
+    private val soldOutCourseIds = mutableSetOf<Long>()
 
     override fun enqueue(
         courseId: Long,
@@ -175,4 +176,14 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
     }
 
     override fun findCourseIds(): Set<Long> = entries.keys
+
+    override fun isSoldOut(courseId: Long): Boolean = courseId in soldOutCourseIds
+
+    override fun markSoldOut(courseId: Long) {
+        soldOutCourseIds += courseId
+    }
+
+    override fun clearSoldOut(courseId: Long) {
+        soldOutCourseIds -= courseId
+    }
 }
