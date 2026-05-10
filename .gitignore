@@ -40,3 +40,4 @@ graphify-out/
 .omx/
 .codex/*
 **/logs/
+k6/tokens.json
