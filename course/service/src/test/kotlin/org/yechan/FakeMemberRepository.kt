@@ -126,6 +126,8 @@ class FakeEnrollmentRepository : EnrollmentRepository {
                 courseId = enrollment.courseId,
                 memberId = enrollment.memberId,
                 status = enrollment.status,
+                paymentPendingStartedAt = enrollment.paymentPendingStartedAt,
+                paymentPendingExpiresAt = enrollment.paymentPendingExpiresAt,
             )
         } else {
             enrollment
@@ -143,21 +145,32 @@ class FakeEnrollmentRepository : EnrollmentRepository {
         now: LocalDateTime,
         limit: Int,
     ): List<EnrollmentExpirationTarget> = enrollments.values
+        .asSequence()
         .filter { it.isPaymentPendingExpired(now) }
         .sortedBy { it.paymentPendingExpiresAt }
-        .map { EnrollmentExpirationTarget(it.courseId, it.memberId) }
+        .map {
+            EnrollmentExpirationTarget(
+                enrollmentId = requireNotNull(it.enrollmentId),
+                courseId = it.courseId,
+            )
+        }
         .take(limit)
+        .take(limit)
+        .toList()
 
     override fun expirePaymentPendingIfExpired(
         enrollmentId: Long,
         now: LocalDateTime,
     ): Boolean {
         val enrollment = enrollments[enrollmentId] ?: return false
-        if (enrollment.isPaymentPendingExpired(now)) {
-            enrollments.remove(enrollmentId)
-            return true
+        if (!enrollment.isPaymentPendingExpired(now)) {
+            return false
         }
-        return false
+
+        enrollment.expirePaymentPending(now)
+        enrollments[enrollmentId] = enrollment
+
+        return true
     }
 }
 
