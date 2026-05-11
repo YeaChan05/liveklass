@@ -36,7 +36,6 @@ import java.time.LocalDateTime
         "spring.datasource.username=root",
         "spring.datasource.password=password",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.liquibase.enabled=false",
     ],
 )
 class EnrollmentRepositoryImplTest {

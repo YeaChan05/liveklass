@@ -28,7 +28,6 @@ import org.yechan.enrollment.EnrollmentEntity
         "spring.datasource.username=root",
         "spring.datasource.password=password",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.liquibase.enabled=false",
     ],
 )
 class MemberRepositoryImplTest {
