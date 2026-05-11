@@ -51,78 +51,63 @@ configureByTypePrefix("kotlin") {
         plugin("jacoco")
     }
 
-    val hasIntegrationTestSources = file("src/integrationTest/kotlin").exists() ||
-        file("src/integrationTest/resources").exists()
+    val hasIntegrationTestSources =
+        file("src/integrationTest/kotlin").exists() ||
+            file("src/integrationTest/resources").exists()
 
     extensions.configure<JavaPluginExtension> {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
+        toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     }
 
-    testing {
-        suites {
-            val test by getting(JvmTestSuite::class)
-            if (hasIntegrationTestSources) {
-                register<JvmTestSuite>("integrationTest") {
-                    sources {
-                        java {
-                            setSrcDirs(listOf("src/integrationTest/kotlin"))
-                        }
-                        resources {
-                            setSrcDirs(listOf("src/integrationTest/resources"))
-                        }
-                    }
-                }
-            }
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
 
-            withType<JvmTestSuite> {
-                useJUnitJupiter()
-
-                targets {
-                    all {
-                        dependencies {
-                            implementation(project())
-                        }
-                        testTask.configure {
-                            testLogging {
-                                events = mutableSetOf(TestLogEvent.FAILED)
-                                exceptionFormat = TestExceptionFormat.FULL
-                            }
-                        }
-                    }
-                }
-            }
+        testLogging {
+            events = setOf(TestLogEvent.FAILED)
+            exceptionFormat = TestExceptionFormat.FULL
         }
     }
 
     if (hasIntegrationTestSources) {
-        val integrationTestImplementation by configurations.getting {
-            extendsFrom(configurations.testImplementation.get())
-        }
+        val sourceSets = extensions.getByType<SourceSetContainer>()
 
-        val integrationTestRuntimeOnly by configurations.getting {
-            extendsFrom(configurations.testRuntimeOnly.get())
-        }
+        val integrationTestSourceSet =
+            sourceSets.create("integrationTest") {
+                java.srcDir("src/integrationTest/kotlin")
+                resources.srcDir("src/integrationTest/resources")
 
-        val integrationTestCompileOnly by configurations.getting
-        val integrationTestAnnotationProcessor by configurations.getting
-
-        tasks {
-            val integrationTest by getting
-            val check by getting {
-                dependsOn("integrationTest")
+                compileClasspath += sourceSets["main"].output + configurations["testRuntimeClasspath"]
+                runtimeClasspath += output + compileClasspath
             }
+
+        configurations.named("integrationTestImplementation") {
+            extendsFrom(configurations["testImplementation"])
         }
 
-        tasks.named("integrationTest") {
+        configurations.named("integrationTestRuntimeOnly") {
+            extendsFrom(configurations["testRuntimeOnly"])
+        }
+
+        tasks.register<Test>("integrationTest") {
+            description = "Runs integration tests."
+            group = LifecycleBasePlugin.VERIFICATION_GROUP
+
+            testClassesDirs = integrationTestSourceSet.output.classesDirs
+            classpath = integrationTestSourceSet.runtimeClasspath
+
+            shouldRunAfter(tasks.named("test"))
             finalizedBy("jacocoIntegrationTestReport")
+        }
+
+        tasks.named("check") {
+            dependsOn("integrationTest")
         }
 
         tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
             dependsOn("integrationTest")
+
             executionData(layout.buildDirectory.file("jacoco/integrationTest.exec"))
-            sourceDirectories.from(files("src/main/kotlin"))
+            sourceDirectories.from("src/main/kotlin")
             classDirectories.from(layout.buildDirectory.dir("classes/kotlin/main"))
         }
     }
@@ -139,6 +124,7 @@ configureByTypePrefix("kotlin") {
         implementation(rootProject.libs.kotlin.logging)
         testImplementation(enforcedPlatform(SpringBootPlugin.BOM_COORDINATES))
         testImplementation("org.springframework.boot:spring-boot-starter-test")
+        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     }
 }
 
