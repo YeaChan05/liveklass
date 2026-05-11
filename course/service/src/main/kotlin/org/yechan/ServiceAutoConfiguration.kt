@@ -13,6 +13,7 @@ import org.yechan.enrollment.EnrollmentUseCase
 import org.yechan.enrollment.EnrollmentWaitlistScheduler
 import org.yechan.member.MemberAuthService
 import org.yechan.member.MemberAuthUseCase
+import java.time.Clock
 
 @Import(ServiceBeanRegistrar::class)
 @AutoConfiguration
@@ -69,5 +70,9 @@ class ServiceBeanRegistrar :
                 bean(),
                 bean(),
             )
+        }
+
+        registerBean<Clock> {
+            Clock.systemUTC()
         }
     })
