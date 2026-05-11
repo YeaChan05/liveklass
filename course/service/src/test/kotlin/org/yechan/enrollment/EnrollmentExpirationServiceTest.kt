@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:filename")
-
 package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
