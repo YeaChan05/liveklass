@@ -5,17 +5,18 @@ import org.yechan.enrollment.EnrollmentModelData
 import java.time.LocalDateTime
 
 interface CourseIdentifier {
-    val courseId: Long?
+    var courseId: Long?
 }
 
 interface CourseProps {
     val creatorId: Long?
     val title: String
     val description: String
-    val price: Money
     val capacity: Int
     val periodStart: LocalDateTime
     val periodEnd: LocalDateTime
+
+    var price: Money
     var seatLeftCount: Int
     var status: CourseStatus
 }
@@ -85,14 +86,15 @@ interface CourseModel :
 }
 
 data class CourseModelData(
-    override val courseId: Long? = null,
     override val creatorId: Long? = null,
     override val title: String,
     override val description: String,
-    override val price: Money,
     override val capacity: Int,
     override val periodStart: LocalDateTime,
     override val periodEnd: LocalDateTime,
+
+    override var courseId: Long? = null,
+    override var price: Money,
     override var seatLeftCount: Int = capacity,
     override var status: CourseStatus = CourseStatus.DRAFT,
 ) : CourseModel {

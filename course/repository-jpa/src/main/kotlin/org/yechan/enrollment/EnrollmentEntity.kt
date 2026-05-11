@@ -52,8 +52,11 @@ class EnrollmentEntity private constructor(
     override var paymentPendingExpiresAt: LocalDateTime,
 ) : BaseEntity(),
     EnrollmentModel {
-    override val enrollmentId: Long?
+    override var enrollmentId: Long?
         get() = id
+        set(value) {
+            id = value
+        }
 
     companion object {
         fun from(

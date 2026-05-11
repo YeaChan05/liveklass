@@ -55,11 +55,17 @@ class CourseEntity private constructor(
 
 ) : BaseEntity(),
     CourseModel {
-    override val courseId: Long?
+    override var courseId: Long?
         get() = id
+        set(value) {
+            id = value
+        }
 
-    override val price: Money
+    override var price: Money
         get() = Money(priceAmount)
+        set(value) {
+            priceAmount = value.amount
+        }
 
     companion object {
         fun of(
@@ -76,11 +82,9 @@ class CourseEntity private constructor(
             periodEnd = course.periodEnd,
             status = course.status,
         ).apply {
-            assignId(course.courseId)
+            if (course.courseId != null) {
+                this.id = course.courseId!!
+            }
         }
-    }
-
-    private fun assignId(id: Long?) {
-        this.id = id
     }
 }

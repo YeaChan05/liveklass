@@ -39,8 +39,11 @@ class MemberEntity private constructor(
     override var status: MemberStatus,
 ) : BaseEntity(),
     MemberModel {
-    override val memberId: Long?
+    override var memberId: Long?
         get() = id
+        set(value) {
+            id = value
+        }
 
     companion object {
         fun from(member: MemberModel): MemberEntity = MemberEntity(

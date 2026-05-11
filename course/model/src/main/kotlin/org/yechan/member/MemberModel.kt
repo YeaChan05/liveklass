@@ -1,7 +1,7 @@
 package org.yechan.member
 
 interface MemberIdentifier {
-    val memberId: Long?
+    var memberId: Long?
 }
 
 interface MemberProps {
@@ -23,7 +23,7 @@ interface MemberModel :
 }
 
 data class MemberModelData(
-    override val memberId: Long? = null,
+    override var memberId: Long? = null,
     override val email: String,
     override val passwordHash: String,
     override val name: String,

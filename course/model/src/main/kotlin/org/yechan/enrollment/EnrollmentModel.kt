@@ -4,7 +4,7 @@ import org.yechan.course.CourseInvalidStateException
 import java.time.LocalDateTime
 
 interface EnrollmentIdentifier {
-    val enrollmentId: Long?
+    var enrollmentId: Long?
 }
 
 interface EnrollmentProps {
@@ -71,7 +71,7 @@ interface EnrollmentModel :
 }
 
 data class EnrollmentModelData(
-    override val enrollmentId: Long? = null,
+    override var enrollmentId: Long? = null,
     override val courseId: Long,
     override val memberId: Long,
     override var status: EnrollmentStatus = EnrollmentStatus.PENDING,
