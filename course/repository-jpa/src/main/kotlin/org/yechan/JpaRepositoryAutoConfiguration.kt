@@ -10,10 +10,10 @@ import org.yechan.enrollment.EnrollmentRepositoryImpl
 import org.yechan.member.MemberRepository
 import org.yechan.member.MemberRepositoryImpl
 
-@Import(RepositoryBeanRegistrar::class)
+@Import(JpaRepositoryBeanRegistrar::class)
 @AutoConfiguration
-class RepositoryAutoConfiguration
-class RepositoryBeanRegistrar :
+class JpaRepositoryAutoConfiguration
+class JpaRepositoryBeanRegistrar :
     BeanRegistrarDsl({
         registerBean<MemberRepository> {
             MemberRepositoryImpl(bean())
