@@ -7,8 +7,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.ContextConfiguration
+import org.yechan.TestConfig
 
 @JdbcTest
+@ContextConfiguration(classes = [TestConfig::class])
 class EnrollmentBulkWriterImplTest @Autowired constructor(
     private val jdbcTemplate: JdbcTemplate,
 ) {
