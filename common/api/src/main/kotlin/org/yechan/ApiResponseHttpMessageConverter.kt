@@ -1,5 +1,6 @@
 package org.yechan
 
+import org.springframework.http.HttpInputMessage
 import org.springframework.http.HttpOutputMessage
 import org.springframework.http.MediaType
 import org.springframework.http.converter.AbstractHttpMessageConverter
@@ -35,7 +36,7 @@ class ApiResponseHttpMessageConverter(
 
     override fun readInternal(
         clazz: Class<out Any>,
-        inputMessage: org.springframework.http.HttpInputMessage,
+        inputMessage: HttpInputMessage,
     ): Any = throw UnsupportedOperationException("응답 쓰기 전용 MessageConverter입니다.")
 
     override fun writeInternal(
