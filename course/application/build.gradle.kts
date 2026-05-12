@@ -6,6 +6,7 @@ dependencies {
     // internal
     implementation(project(":course:api"))
     implementation(project(":course:repository-jpa"))
+    implementation(project(":course:repository-jdbc"))
     implementation(project(":course:repository-redis"))
     implementation(project(":course:schema"))
 
