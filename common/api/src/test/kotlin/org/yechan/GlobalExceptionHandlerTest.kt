@@ -1,10 +1,8 @@
-package org.yechan.member
+package org.yechan
 
-import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
-import org.yechan.BusinessException
-import org.yechan.GlobalExceptionHandler
 
 class GlobalExceptionHandlerTest {
     @Test
@@ -14,8 +12,8 @@ class GlobalExceptionHandlerTest {
 
         val response = handler.handleBusinessException(exception)
 
-        assertThat(response.statusCode).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR)
-        assertThat(response.body).isSameAs(exception.message)
+        Assertions.assertThat(response.statusCode).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR)
+        Assertions.assertThat(response.body).isSameAs(exception.message)
     }
 
     @Test
@@ -25,8 +23,8 @@ class GlobalExceptionHandlerTest {
 
         val response = handler.handleBusinessException(exception)
 
-        assertThat(response.statusCode).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR)
-        assertThat(response.body).isSameAs(exception.message)
+        Assertions.assertThat(response.statusCode).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR)
+        Assertions.assertThat(response.body).isSameAs(exception.message)
     }
 
     private class SomeBusinessException(
