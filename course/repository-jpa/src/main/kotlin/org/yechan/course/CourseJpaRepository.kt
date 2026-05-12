@@ -35,4 +35,15 @@ interface CourseJpaRepository : JpaRepository<CourseEntity, Long> {
     ): Int
 
     fun findAllByStatus(status: CourseStatus): List<CourseEntity>
+
+    @Query(
+        """
+            select c
+            from CourseEntity c
+            where c.id in :ids
+              and c.status = CourseStatus.OPEN
+              and c.seatLeftCount > 0
+        """,
+    )
+    fun findAllOpened(@Param("ids") ids: Collection<Long>): List<CourseEntity>
 }

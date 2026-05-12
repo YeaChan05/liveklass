@@ -21,6 +21,9 @@ class CourseRepositoryImpl(
     override fun findAllByStatus(status: CourseStatus): List<CourseModel> = courseJpaRepository.findAllByStatus(status)
         .map(CourseEntity::toDomain)
 
+    override fun findAllOpendCoursesByIds(courseIds: Collection<Long>): List<CourseModel> = courseJpaRepository.findAllOpened(courseIds)
+        .map(CourseEntity::toDomain)
+
     override fun releaseSeatIfPossible(courseId: Long): Boolean = courseJpaRepository.releaseSeatIfPossible(courseId) == 1
 }
 
