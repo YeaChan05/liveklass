@@ -9,11 +9,9 @@ class EnrollmentRepositoryImpl(
 ) : EnrollmentRepository {
     override fun save(
         enrollment: EnrollmentModel,
-        courseId: Long,
     ): EnrollmentModel = enrollmentJpaRepository.save(
         EnrollmentEntity.from(
             enrollment = enrollment,
-            courseId = courseId,
         ),
     ).toDomain()
 

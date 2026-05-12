@@ -61,9 +61,8 @@ class EnrollmentEntity private constructor(
     companion object {
         fun from(
             enrollment: EnrollmentModel,
-            courseId: Long,
         ): EnrollmentEntity = EnrollmentEntity(
-            courseId = courseId,
+            courseId = enrollment.courseId,
             memberId = enrollment.memberId,
             status = enrollment.status,
             paymentPendingStartedAt = enrollment.paymentPendingStartedAt,
