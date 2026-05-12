@@ -4,10 +4,13 @@ import org.yechan.course.CourseModel
 import org.yechan.course.CourseModelData
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseStatus
+import org.yechan.enrollment.CourseBulkWriter
+import org.yechan.enrollment.EnrollmentBulkWriter
 import org.yechan.enrollment.EnrollmentExpirationTarget
 import org.yechan.enrollment.EnrollmentModel
 import org.yechan.enrollment.EnrollmentModelData
 import org.yechan.enrollment.EnrollmentRepository
+import org.yechan.enrollment.EnrollmentStatus
 import org.yechan.enrollment.EnrollmentWaitlistEntry
 import org.yechan.enrollment.EnrollmentWaitlistRepository
 import org.yechan.member.MemberModel
@@ -30,8 +33,10 @@ class FakeMemberRepository : MemberRepository {
     override fun findById(id: Long): MemberModel? = members[id]
 }
 
-class FakeCourseRepository : CourseRepository {
-    private val courses = linkedMapOf<Long, CourseModel>()
+class FakeCourseRepository :
+    CourseRepository,
+    CourseBulkWriter {
+    val courses = linkedMapOf<Long, CourseModel>()
     private var nextId = 1L
 
     override fun save(course: CourseModel): CourseModel {
@@ -59,7 +64,12 @@ class FakeCourseRepository : CourseRepository {
     override fun findById(courseId: Long): CourseModel? = courses[courseId]
 
     override fun findAll(): List<CourseModel> = courses.values.toList()
+
     override fun findAllByStatus(status: CourseStatus): List<CourseModel> = courses.values.filter { it.status == status }
+
+    override fun findAllOpendCoursesByIds(courseIds: Collection<Long>): List<CourseModel> = courses.values.filter {
+        it.courseId in courseIds && it.status == CourseStatus.OPEN
+    }
 
     override fun reserveSeatIfAvailable(courseId: Long): Boolean {
         val course = courses[courseId] ?: return false
@@ -72,20 +82,33 @@ class FakeCourseRepository : CourseRepository {
             return false
         }
 
-        courses[courseId] = CourseModelData(
-            courseId = course.courseId,
-            creatorId = course.creatorId,
-            title = course.title,
-            description = course.description,
-            price = course.price,
-            capacity = course.capacity,
+        courses[courseId] = course.copyWithSeatLeftCount(
             seatLeftCount = course.seatLeftCount - 1,
-            periodStart = course.periodStart,
-            periodEnd = course.periodEnd,
-            status = course.status,
         )
 
         return true
+    }
+
+    override fun reserveSeatsBulk(courseIds: Map<Long, Int>) {
+        courseIds.forEach { (courseId, count) ->
+            if (count <= 0) {
+                return@forEach
+            }
+
+            val course = courses[courseId] ?: return@forEach
+
+            if (course.status != CourseStatus.OPEN) {
+                return@forEach
+            }
+
+            if (course.seatLeftCount < count) {
+                return@forEach
+            }
+
+            courses[courseId] = course.copyWithSeatLeftCount(
+                seatLeftCount = course.seatLeftCount - count,
+            )
+        }
     }
 
     override fun releaseSeatIfPossible(courseId: Long): Boolean {
@@ -95,39 +118,42 @@ class FakeCourseRepository : CourseRepository {
             return false
         }
 
-        courses[courseId] = CourseModelData(
-            courseId = course.courseId,
-            creatorId = course.creatorId,
-            title = course.title,
-            description = course.description,
-            price = course.price,
-            capacity = course.capacity,
+        courses[courseId] = course.copyWithSeatLeftCount(
             seatLeftCount = course.seatLeftCount + 1,
-            periodStart = course.periodStart,
-            periodEnd = course.periodEnd,
-            status = course.status,
         )
 
         return true
     }
+
+    private fun CourseModel.copyWithSeatLeftCount(
+        seatLeftCount: Int,
+    ): CourseModel = CourseModelData(
+        courseId = courseId,
+        creatorId = creatorId,
+        title = title,
+        description = description,
+        price = price,
+        capacity = capacity,
+        seatLeftCount = seatLeftCount,
+        periodStart = periodStart,
+        periodEnd = periodEnd,
+        status = status,
+    )
 }
 
-class FakeEnrollmentRepository : EnrollmentRepository {
-    private val enrollments = linkedMapOf<Long, EnrollmentModel>()
+class FakeEnrollmentRepository :
+    EnrollmentRepository,
+    EnrollmentBulkWriter {
+    val enrollments = linkedMapOf<Long, EnrollmentModel>()
     private var nextId = 1L
 
     override fun save(
         enrollment: EnrollmentModel,
-        courseId: Long,
     ): EnrollmentModel {
         val saved = if (enrollment.enrollmentId == null) {
-            EnrollmentModelData(
+            enrollment.copyWithId(
                 enrollmentId = nextId++,
                 courseId = enrollment.courseId,
-                memberId = enrollment.memberId,
-                status = enrollment.status,
-                paymentPendingStartedAt = enrollment.paymentPendingStartedAt,
-                paymentPendingExpiresAt = enrollment.paymentPendingExpiresAt,
             )
         } else {
             enrollment
@@ -135,6 +161,14 @@ class FakeEnrollmentRepository : EnrollmentRepository {
 
         enrollments[requireNotNull(saved.enrollmentId)] = saved
         return saved
+    }
+
+    override fun saveAllBulk(enrollments: List<EnrollmentModelData>) {
+        enrollments.forEach { enrollment ->
+            save(
+                enrollment = enrollment,
+            )
+        }
     }
 
     override fun findById(enrollmentId: Long): EnrollmentModel? = enrollments[enrollmentId]
@@ -146,7 +180,8 @@ class FakeEnrollmentRepository : EnrollmentRepository {
         limit: Int,
     ): List<EnrollmentExpirationTarget> = enrollments.values
         .asSequence()
-        .filter { it.isPaymentPendingExpired(now) }
+        .filter { it.status == EnrollmentStatus.PENDING }
+        .filter { it.paymentPendingExpiresAt <= now }
         .sortedBy { it.paymentPendingExpiresAt }
         .map {
             EnrollmentExpirationTarget(
@@ -155,7 +190,6 @@ class FakeEnrollmentRepository : EnrollmentRepository {
             )
         }
         .take(limit)
-        .take(limit)
         .toList()
 
     override fun expirePaymentPendingIfExpired(
@@ -163,15 +197,44 @@ class FakeEnrollmentRepository : EnrollmentRepository {
         now: LocalDateTime,
     ): Boolean {
         val enrollment = enrollments[enrollmentId] ?: return false
-        if (!enrollment.isPaymentPendingExpired(now)) {
+
+        if (enrollment.status != EnrollmentStatus.PENDING) {
             return false
         }
 
-        enrollment.expirePaymentPending(now)
-        enrollments[enrollmentId] = enrollment
+        if (enrollment.paymentPendingExpiresAt > now) {
+            return false
+        }
+
+        enrollments[enrollmentId] = enrollment.copyWithStatus(
+            status = EnrollmentStatus.EXPIRED,
+        )
 
         return true
     }
+
+    private fun EnrollmentModel.copyWithId(
+        enrollmentId: Long,
+        courseId: Long,
+    ): EnrollmentModel = EnrollmentModelData(
+        enrollmentId = enrollmentId,
+        courseId = courseId,
+        memberId = memberId,
+        status = status,
+        paymentPendingStartedAt = paymentPendingStartedAt,
+        paymentPendingExpiresAt = paymentPendingExpiresAt,
+    )
+
+    private fun EnrollmentModel.copyWithStatus(
+        status: EnrollmentStatus,
+    ): EnrollmentModel = EnrollmentModelData(
+        enrollmentId = enrollmentId,
+        courseId = courseId,
+        memberId = memberId,
+        status = status,
+        paymentPendingStartedAt = paymentPendingStartedAt,
+        paymentPendingExpiresAt = paymentPendingExpiresAt,
+    )
 }
 
 class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
@@ -188,6 +251,8 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
             memberId = memberId,
             requestedAt = requestedAt,
         )
+
+        entries[courseId]?.sortBy { it.requestedAt }
     }
 
     override fun pop(courseId: Long): EnrollmentWaitlistEntry? {
@@ -212,7 +277,7 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
         }
     }
 
-    override fun findCourseIds(): Set<Long> = entries.keys
+    override fun findCourseIds(): Set<Long> = entries.keys.toSet()
 
     override fun isSoldOut(courseId: Long): Boolean = courseId in soldOutCourseIds
 

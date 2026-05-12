@@ -64,7 +64,6 @@ class EnrollmentExpirationServiceTest {
                 paymentPendingStartedAt = now.minusMinutes(20),
                 paymentPendingExpiresAt = now.minusMinutes(10),
             ),
-            courseId,
         )
 
         val result = service.expirePaymentPendingEnrollments(now)
@@ -105,7 +104,6 @@ class EnrollmentExpirationServiceTest {
                 paymentPendingStartedAt = now.minusMinutes(5),
                 paymentPendingExpiresAt = now.plusMinutes(5),
             ),
-            courseId,
         )
 
         val result = service.expirePaymentPendingEnrollments(now)
@@ -144,7 +142,6 @@ class EnrollmentExpirationServiceTest {
                 paymentPendingStartedAt = now.minusMinutes(20),
                 paymentPendingExpiresAt = now.minusMinutes(10),
             ),
-            courseId,
         )
 
         assertThatThrownBy {
@@ -193,7 +190,6 @@ class EnrollmentExpirationServiceTest {
                 paymentPendingStartedAt = now.minusMinutes(30),
                 paymentPendingExpiresAt = now.minusMinutes(20),
             ),
-            firstCourseId,
         )
 
         enrollmentRepository.save(
@@ -203,7 +199,6 @@ class EnrollmentExpirationServiceTest {
                 paymentPendingStartedAt = now.minusMinutes(20),
                 paymentPendingExpiresAt = now.minusMinutes(10),
             ),
-            secondCourseId,
         )
 
         val result = service.expirePaymentPendingEnrollments(now)
