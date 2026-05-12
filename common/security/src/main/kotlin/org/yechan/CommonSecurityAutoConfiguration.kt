@@ -51,15 +51,6 @@ class CommonSecurityBeanRegistrar :
         }
 
         registerBean<SecurityFilterChain> {
-            val authorizeHttpRequestsCustomizers =
-                beanProvider<AuthorizeHttpRequestsCustomizer>()
-
-            val securityFilterChainCustomizers =
-                beanProvider<SecurityFilterChainCustomizer>()
-
-            val roleHierarchy =
-                beanProvider<RoleHierarchy>().ifAvailable
-
             val http =
                 bean<HttpSecurity>()
                     .formLogin(FormLoginConfigurer<HttpSecurity>::disable)
@@ -71,21 +62,22 @@ class CommonSecurityBeanRegistrar :
                         handler.authenticationEntryPoint(bean())
                         handler.accessDeniedHandler(bean())
                     }
-                    .authorizeHttpRequests { registry ->
-                        authorizeHttpRequestsCustomizers
-                            .orderedStream()
-                            .forEach { customizer ->
-                                customizer.customize(registry)
-                            }
-                    }
-                    .let { http ->
-                        if (roleHierarchy != null) {
-                            http.setSharedObject(RoleHierarchy::class.java, roleHierarchy)
-                        }
-                        http
-                    }
 
-            securityFilterChainCustomizers
+            beanProvider<RoleHierarchy>()
+                .ifAvailable
+                ?.let { roleHierarchy ->
+                    http.setSharedObject(RoleHierarchy::class.java, roleHierarchy)
+                }
+
+            http.authorizeHttpRequests { registry ->
+                beanProvider<AuthorizeHttpRequestsCustomizer>()
+                    .orderedStream()
+                    .forEach { customizer ->
+                        customizer.customize(registry)
+                    }
+            }
+
+            beanProvider<SecurityFilterChainCustomizer>()
                 .orderedStream()
                 .forEach { customizer ->
                     customizer.customize(http)
