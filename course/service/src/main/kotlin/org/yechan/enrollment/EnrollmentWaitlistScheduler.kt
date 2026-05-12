@@ -8,7 +8,7 @@ import org.yechan.course.CourseStatus
 open class EnrollmentWaitlistScheduler(
     private val waitlistRepository: EnrollmentWaitlistRepository,
     private val courseRepository: CourseRepository,
-    private val courseBlukWriter: CourseBulkWriter,
+    private val courseBulkWriter: CourseBulkWriter,
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
 ) {
     @Scheduled(fixedDelay = 5_000)
@@ -40,7 +40,7 @@ open class EnrollmentWaitlistScheduler(
             .groupingBy { it.courseId }
             .eachCount()
 
-        courseBlukWriter.reserveSeatsBulk(reservedCountsByCourseId)
+        courseBulkWriter.reserveSeatsBulk(reservedCountsByCourseId)
 
         val enrollments = promotions.map { promotion ->
             EnrollmentModelData(
