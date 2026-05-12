@@ -12,4 +12,6 @@ interface CourseRepository {
     fun reserveSeatIfAvailable(courseId: Long): Boolean
 
     fun releaseSeatIfPossible(courseId: Long): Boolean
+
+    fun findAllOpendCoursesByIds(courseIds: Collection<Long>): List<CourseModel>
 }
