@@ -1,5 +1,6 @@
 package org.yechan
 
+import org.springframework.core.io.Resource
 import org.springframework.http.HttpInputMessage
 import org.springframework.http.HttpOutputMessage
 import org.springframework.http.MediaType
@@ -89,5 +90,5 @@ class ApiResponseHttpMessageConverter(
     private fun isExcludedType(clazz: Class<*>): Boolean = ByteArray::class.java.isAssignableFrom(clazz) ||
         ByteArrayOutputStream::class.java.isAssignableFrom(clazz) ||
         StreamingResponseBody::class.java.isAssignableFrom(clazz) ||
-        org.springframework.core.io.Resource::class.java.isAssignableFrom(clazz)
+        Resource::class.java.isAssignableFrom(clazz)
 }
