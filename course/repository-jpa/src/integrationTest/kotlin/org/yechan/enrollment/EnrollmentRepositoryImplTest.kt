@@ -13,7 +13,6 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.TestPropertySource
 import org.yechan.course.CourseEntity
 import org.yechan.course.CourseJpaRepository
 import org.yechan.course.CourseModelData
@@ -29,15 +28,6 @@ import java.time.LocalDateTime
 @Import(EnrollmentRepositoryImpl::class)
 @ContextConfiguration(classes = [EnrollmentRepositoryImplTest.TestApplication::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(
-    properties = [
-        "spring.datasource.url=jdbc:tc:mysql:8.4.8://localhost:3306/course_repository_test?useSSL=false&serverTimezone=UTC&TC_DAEMON=true",
-        "spring.datasource.driver-class-name=org.testcontainers.jdbc.ContainerDatabaseDriver",
-        "spring.datasource.username=root",
-        "spring.datasource.password=password",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-    ],
-)
 class EnrollmentRepositoryImplTest {
     @Autowired
     private lateinit var enrollmentRepository: EnrollmentRepositoryImpl
@@ -66,7 +56,6 @@ class EnrollmentRepositoryImplTest {
                 memberId = member.id!!,
                 status = EnrollmentStatus.PENDING,
             ),
-            courseId = course.id!!,
         )
 
         assertThat(saved.enrollmentId).isNotNull()
@@ -86,7 +75,6 @@ class EnrollmentRepositoryImplTest {
                 memberId = member.id!!,
                 status = EnrollmentStatus.CONFIRMED,
             ),
-            courseId = course.id!!,
         )
 
         val found = enrollmentRepository.findById(saved.enrollmentId!!)
@@ -107,11 +95,9 @@ class EnrollmentRepositoryImplTest {
         val course = persistCourse(creator)
         val memberEnrollment = enrollmentRepository.save(
             EnrollmentModelData(courseId = course.id!!, memberId = member.id!!),
-            courseId = course.id!!,
         )
         enrollmentRepository.save(
             EnrollmentModelData(courseId = course.id!!, memberId = otherMember.id!!),
-            courseId = course.id!!,
         )
 
         val enrollments = enrollmentRepository.findByMemberId(member.id!!)
