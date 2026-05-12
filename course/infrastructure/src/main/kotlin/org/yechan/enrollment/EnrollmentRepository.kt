@@ -4,7 +4,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 
 interface EnrollmentRepository {
-    fun save(enrollment: EnrollmentModel, courseId: Long): EnrollmentModel
+    fun save(enrollment: EnrollmentModel): EnrollmentModel
 
     fun findById(enrollmentId: Long): EnrollmentModel?
 
