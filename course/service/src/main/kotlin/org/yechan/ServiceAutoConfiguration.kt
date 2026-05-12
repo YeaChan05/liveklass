@@ -41,6 +41,7 @@ class ServiceBeanRegistrar :
                 bean(),
                 bean(),
                 bean(),
+                bean(),
             )
         }
 

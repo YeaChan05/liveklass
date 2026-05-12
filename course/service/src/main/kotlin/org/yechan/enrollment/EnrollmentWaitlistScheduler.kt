@@ -8,23 +8,47 @@ import org.yechan.course.CourseStatus
 open class EnrollmentWaitlistScheduler(
     private val waitlistRepository: EnrollmentWaitlistRepository,
     private val courseRepository: CourseRepository,
-    private val enrollmentRepository: EnrollmentRepository,
+    private val courseBlukWriter: CourseBulkWriter,
+    private val enrollmentBulkWriter: EnrollmentBulkWriter,
 ) {
     @Scheduled(fixedDelay = 5_000)
     @Transactional
     open fun processWaitlists() {
-        waitlistRepository.findCourseIds().forEach { courseId ->
-            processWaitlist(courseId)
-        }
-    }
+        val courseIds = waitlistRepository.findCourseIds().ifEmpty { return }
 
-    private fun processWaitlist(courseId: Long) {
-        var course = courseRepository.findById(courseId) ?: return
-        while (course.status == CourseStatus.OPEN && course.seatLeftCount > 0) {
-            val waitlistEntry = waitlistRepository.pop(courseId) ?: return
-            course = courseRepository.save(course.reserveSeat())
-            val enrollment = course.requestEnrollment(waitlistEntry.memberId)
-            enrollmentRepository.save(enrollment, courseId)
+        val courses = courseRepository.findAllOpendCoursesByIds(courseIds)
+
+        val promotions = courses.flatMap { course ->
+            val courseId = course.courseId ?: return@flatMap emptyList()
+            val promotableCount = course.seatLeftCount
+
+            if (course.status != CourseStatus.OPEN || promotableCount <= 0) {
+                return@flatMap emptyList()
+            }
+
+            (1..promotableCount).mapNotNull {
+                val waitlist = waitlistRepository.pop(courseId) ?: return@mapNotNull null
+
+                EnrollmentModelData(
+                    courseId = courseId,
+                    memberId = waitlist.memberId,
+                )
+            }
+        }.ifEmpty { return }
+
+        val reservedCountsByCourseId = promotions
+            .groupingBy { it.courseId }
+            .eachCount()
+
+        courseBlukWriter.reserveSeatsBulk(reservedCountsByCourseId)
+
+        val enrollments = promotions.map { promotion ->
+            EnrollmentModelData(
+                courseId = promotion.courseId,
+                memberId = promotion.memberId,
+            )
         }
+
+        enrollmentBulkWriter.saveAllBulk(enrollments)
     }
 }

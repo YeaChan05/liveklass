@@ -66,7 +66,7 @@ class EnrollmentService(
             status = EnrollmentStatus.PENDING,
         )
 
-        return enrollmentRepository.save(enrollment, courseId).toResult()
+        return enrollmentRepository.save(enrollment).toResult()
     }
 
     @Transactional
@@ -79,7 +79,7 @@ class EnrollmentService(
                 throw CourseInvalidStateException(e.message ?: "결제를 확정할 수 없습니다.")
             }
 
-        return enrollmentRepository.save(confirmed, confirmed.courseId).toResult()
+        return enrollmentRepository.save(confirmed).toResult()
     }
 
     @Transactional
@@ -93,7 +93,7 @@ class EnrollmentService(
                 throw CourseInvalidStateException(e.message ?: "수강 신청을 취소할 수 없습니다.")
             }
 
-        val savedEnrollment = enrollmentRepository.save(cancelled, enrollment.courseId)
+        val savedEnrollment = enrollmentRepository.save(cancelled)
 
         val released = courseRepository.releaseSeatIfPossible(enrollment.courseId)
 
