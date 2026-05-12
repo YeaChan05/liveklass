@@ -299,6 +299,33 @@ class MemberAuthServiceTest {
             .hasMessage("회원 정보를 찾을 수 없습니다.")
     }
 
+    @Test
+    fun `현재 사용자 이메일 조회는 활성 회원을 반환한다`() {
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.CLASSMATE,
+            ),
+        )
+
+        val result = service.getCurrentUserByEmail("student@example.com")
+
+        assertThat(result.id).isEqualTo(member.userId)
+        assertThat(result.email).isEqualTo("student@example.com")
+        assertThat(result.name).isEqualTo("홍길동")
+        assertThat(result.role).isEqualTo(MemberRole.CLASSMATE)
+        assertThat(result.status).isEqualTo(MemberStatus.ACTIVE)
+    }
+
+    @Test
+    fun `현재 사용자 이메일 조회는 알 수 없는 사용자를 거부한다`() {
+        assertThatThrownBy { service.getCurrentUserByEmail("missing@example.com") }
+            .isInstanceOf(BusinessException::class.java)
+            .hasMessage("회원 정보를 찾을 수 없습니다.")
+    }
+
     private class FakeMemberRepository : MemberRepository {
         private val members = linkedMapOf<Long, MemberModel>()
         private var nextId = 1L
