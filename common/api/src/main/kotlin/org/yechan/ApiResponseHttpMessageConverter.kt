@@ -29,10 +29,10 @@ class ApiResponseHttpMessageConverter(
             return false
         }
 
-        return mediaType == null ||
-            mediaType == MediaType.ALL ||
-            mediaType.isCompatibleWith(MediaType.APPLICATION_JSON) ||
-            mediaType.subtype.endsWith("+json")
+        return when (mediaType) {
+            null, MediaType.ALL, MediaType.APPLICATION_JSON -> true
+            else -> mediaType.subtype.endsWith("+json")
+        }
     }
 
     override fun readInternal(
