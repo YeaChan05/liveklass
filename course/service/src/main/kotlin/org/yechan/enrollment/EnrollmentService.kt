@@ -72,13 +72,7 @@ class EnrollmentService(
     @Transactional
     override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
-        val confirmed =
-            try {
-                enrollment.confirm()
-            } catch (e: IllegalStateException) {
-                throw CourseInvalidStateException(e.message ?: "결제를 확정할 수 없습니다.")
-            }
-
+        val confirmed = enrollment.confirm()
         return enrollmentRepository.save(confirmed).toResult()
     }
 
@@ -86,20 +80,12 @@ class EnrollmentService(
     override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
 
-        val cancelled =
-            try {
-                enrollment.cancel()
-            } catch (e: IllegalStateException) {
-                throw CourseInvalidStateException(e.message ?: "수강 신청을 취소할 수 없습니다.")
-            }
+        val cancelled = enrollment.cancel()
 
         val savedEnrollment = enrollmentRepository.save(cancelled)
 
-        val released = courseRepository.releaseSeatIfPossible(enrollment.courseId)
-
-        if (!released) {
-            throw CourseInvalidStateException("좌석을 반환할 수 없습니다.")
-        }
+        courseRepository.releaseSeatIfPossible(enrollment.courseId)
+            .also { if (!it) throw CourseInvalidStateException("좌석을 반환할 수 없습니다.") }
 
         waitlistRepository.clearSoldOut(enrollment.courseId)
 
