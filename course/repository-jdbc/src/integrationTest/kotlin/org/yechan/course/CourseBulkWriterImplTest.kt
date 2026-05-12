@@ -15,9 +15,7 @@ import org.yechan.TestConfig
 @JdbcTest
 @Import(CourseBulkWriterImpl::class)
 @ContextConfiguration(classes = [TestConfig::class])
-class CourseBulkWriterImplTest
-@Autowired
-constructor(
+class CourseBulkWriterImplTest @Autowired constructor(
     private val jdbcTemplate: JdbcTemplate,
 ) {
     private val courseBulkWriter = CourseBulkWriterImpl(jdbcTemplate)
