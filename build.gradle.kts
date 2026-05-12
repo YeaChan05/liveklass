@@ -1,4 +1,3 @@
-
 import com.linecorp.support.project.multi.recipe.configureByTypeExpression
 import com.linecorp.support.project.multi.recipe.configureByTypeHaving
 import com.linecorp.support.project.multi.recipe.configureByTypePrefix
@@ -73,11 +72,10 @@ configureByTypePrefix("kotlin") {
 
         val integrationTestSourceSet =
             sourceSets.create("integrationTest") {
-                java.srcDir("src/integrationTest/kotlin")
-                resources.srcDir("src/integrationTest/resources")
+                java.setSrcDirs(listOf("src/integrationTest/kotlin"))
 
-                compileClasspath += sourceSets["main"].output + configurations["testRuntimeClasspath"]
-                runtimeClasspath += output + compileClasspath
+                compileClasspath += sourceSets["main"].output + configurations["testCompileClasspath"]
+                runtimeClasspath += output + compileClasspath + configurations["testRuntimeClasspath"]
             }
 
         configurations.named("integrationTestImplementation") {
@@ -89,6 +87,7 @@ configureByTypePrefix("kotlin") {
         }
 
         tasks.register<Test>("integrationTest") {
+            useJUnitPlatform()
             description = "Runs integration tests."
             group = LifecycleBasePlugin.VERIFICATION_GROUP
 
@@ -169,6 +168,12 @@ configureByTypeHaving("boot", "jpa", "repository") {
 
     dependencies {
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    }
+}
+
+configureByTypeHaving("boot", "jdbc", "repository") {
+    dependencies {
+        implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     }
 }
 
