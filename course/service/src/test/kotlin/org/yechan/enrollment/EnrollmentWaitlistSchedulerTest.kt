@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test
 import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
+import org.yechan.course.CourseModelData
 import org.yechan.course.CourseService
+import org.yechan.course.CourseStatus
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
 import org.yechan.course.Money
@@ -51,6 +53,59 @@ class EnrollmentWaitlistSchedulerTest {
         assertThat(enrollments).hasSize(1)
         assertThat(waitlistRepository.findCourseIds()).containsExactly(course.courseId)
         assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
+    }
+
+    @Test
+    fun `좌석이 없는 강의는 대기열을 처리하지 않는다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        courseRepository.reserveSeatIfAvailable(course.courseId)
+
+        waitlistRepository.enqueue(
+            courseId = course.courseId,
+            memberId = 2L,
+            requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+
+        scheduler.processWaitlists()
+
+        val changedCourse = courseService.getCourse(course.courseId)
+        val enrollments = enrollmentRepository.enrollments.values
+            .filter { it.memberId == 2L }
+
+        assertThat(changedCourse.seatLeftCount).isEqualTo(0)
+        assertThat(enrollments).isEmpty()
+        assertThat(waitlistRepository.findCourseIds()).containsExactly(course.courseId)
+        assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(2L)
+    }
+
+    @Test
+    fun `대기열이 비어 있으면 아무 작업도 하지 않는다`() {
+        val course = courseRepository.save(
+            CourseModelData(
+                courseId = 1L,
+                capacity = 10,
+                creatorId = 1L,
+                seatLeftCount = 10,
+                status = CourseStatus.OPEN,
+                title = "Kotlin Basic",
+                description = "Kotlin course",
+                price = Money(100_000L),
+                periodStart = LocalDateTime.of(2026, 6, 1, 0, 0),
+                periodEnd = LocalDateTime.of(2026, 6, 30, 0, 0),
+            ),
+        )
+
+        scheduler.processWaitlists()
+
+        val changedCourse = courseRepository.findById(course.courseId!!)
+
+        assertThat(changedCourse?.seatLeftCount).isEqualTo(10)
+        assertThat(enrollmentRepository.findByMemberId(1L)).isEmpty()
     }
 
     private fun createCourseCommand(
