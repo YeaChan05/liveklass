@@ -29,7 +29,6 @@ goals = true
 
 child_agents_md = true
 
-codex_hooks = true
 [apps._default]
 enabled = false
 
