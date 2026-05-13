@@ -1,5 +1,6 @@
 package org.yechan
 
+import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseModel
 import org.yechan.course.CourseModelData
 import org.yechan.course.CourseRepository
@@ -139,6 +140,29 @@ class FakeCourseRepository :
         periodEnd = periodEnd,
         status = status,
     )
+
+    override fun releaseSeatsBulk(courseIds: Map<Long, Int>) {
+        val targets = courseIds.filterValues { it > 0 }
+        if (targets.isEmpty()) {
+            return
+        }
+
+        targets.forEach { (courseId, count) ->
+            val course = courses[courseId]
+                ?: throw CourseInvalidStateException("좌석을 반환할 수 없습니다.")
+
+            if (course.seatLeftCount + count > course.capacity) {
+                throw CourseInvalidStateException("좌석을 반환할 수 없습니다.")
+            }
+        }
+
+        targets.forEach { (courseId, count) ->
+            val course = courses[courseId] ?: return@forEach
+            courses[courseId] = course.copyWithSeatLeftCount(
+                seatLeftCount = course.seatLeftCount + count,
+            )
+        }
+    }
 }
 
 class FakeEnrollmentRepository :
@@ -235,6 +259,26 @@ class FakeEnrollmentRepository :
         paymentPendingStartedAt = paymentPendingStartedAt,
         paymentPendingExpiresAt = paymentPendingExpiresAt,
     )
+
+    override fun updateAllExpired(
+        courseIds: Collection<Long>,
+        now: LocalDateTime,
+    ): Map<Long, Int> {
+        val targets = enrollments.values
+            .filter { it.status == EnrollmentStatus.PENDING }
+            .filter { it.paymentPendingExpiresAt <= now }
+            .filter { it.courseId in courseIds }
+
+        targets.forEach { enrollment ->
+            enrollments[requireNotNull(enrollment.enrollmentId)] = enrollment.copyWithStatus(
+                status = EnrollmentStatus.EXPIRED,
+            )
+        }
+
+        return targets
+            .groupBy { it.courseId }
+            .mapValues { (_, enrollments) -> enrollments.size }
+    }
 }
 
 class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
