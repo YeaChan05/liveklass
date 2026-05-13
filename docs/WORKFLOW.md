@@ -114,6 +114,7 @@ Run:
 - Build/lint checks
 
 Requirements:
+- `/gradlew build` must pass without errors.
 - All defined unit tests, integration tests, and listed build/lint checks must pass.
 - Verify no regression occurred.
 - Verify behavior matches requirements and the expected behavior defined in Step 2.
