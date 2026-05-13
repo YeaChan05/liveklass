@@ -25,9 +25,10 @@ class EnrollmentServiceTest {
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(memberRepository, courseRepository)
+    private val enrollmentTransactionService = EnrollmentTransactionService(courseRepository, enrollmentRepository)
     private val service =
         EnrollmentService(
-            courseRepository,
+            enrollmentTransactionService,
             enrollmentRepository,
             waitlistRepository,
         )
