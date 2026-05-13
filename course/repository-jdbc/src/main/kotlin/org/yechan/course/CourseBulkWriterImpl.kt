@@ -10,82 +10,116 @@ open class CourseBulkWriterImpl(
 ) : CourseBulkWriter {
     @Transactional
     override fun reserveSeatsBulk(courseIds: Map<Long, Int>) {
-        val command = ReserveSeatsCommand.from(courseIds)
+        val targets = courseIds.toTargets().ifEmpty { return }
 
-        if (command.isEmpty()) {
-            return
-        }
+        val caseSql = targets.caseSql()
+        val inSql = targets.inSql()
 
-        val updatedCount = jdbcTemplate.update(
-            RESERVE_SEATS_BULK_SQL,
-            command.toJson(),
-            CourseStatus.OPEN.name,
+        val sql = reserveSeatsBulkSql(
+            caseSql = caseSql,
+            inSql = inSql,
         )
 
-        if (updatedCount != command.size) {
+        val params = buildList {
+            addAll(targets.caseParams())
+            addAll(targets.inParams())
+            add(CourseStatus.OPEN.name)
+            addAll(targets.caseParams())
+        }
+
+        val updatedCount = jdbcTemplate.update(sql, *params.toTypedArray())
+
+        if (updatedCount != targets.size) {
             throw CourseInvalidStateException(
-                """
-                강좌 예약에 실패했습니다. 
-                기대: ${command.size}, 실제: $updatedCount.
-                """.trimIndent() + "\n" + command.toJson(),
+                "강좌 좌석 예약에 실패했습니다. expected=${targets.size}, actual=$updatedCount",
             )
         }
     }
 
-    private companion object {
-        @Language("SQL")
-        private const val RESERVE_SEATS_BULK_SQL =
-            """
-            UPDATE courses c
-            JOIN JSON_TABLE(
-                ?,
-                '$[*]' COLUMNS (
-                    course_id BIGINT PATH '$.courseId',
-                    quantity INT PATH '$.quantity'
-                )
-            ) target ON target.course_id = c.id
-            SET c.seat_left_count = c.seat_left_count - target.quantity
-            WHERE c.status = ?
-              AND c.seat_left_count >= target.quantity
-            """
-    }
-}
+    @Transactional
+    override fun releaseSeatsBulk(courseIds: Map<Long, Int>) {
+        val targets = courseIds.toTargets().ifEmpty { return }
 
-private class ReserveSeatsCommand private constructor(
-    private val requests: List<ReserveSeatRequest>,
-) {
-    val size: Int
-        get() = requests.size
+        val caseSql = targets.caseSql()
+        val inSql = targets.inSql()
 
-    fun isEmpty(): Boolean = requests.isEmpty()
+        val sql = releaseSeatsBulkSql(
+            caseSql = caseSql,
+            inSql = inSql,
+        )
 
-    fun toJson(): String = requests.joinToString(
-        prefix = "[",
-        postfix = "]",
-        separator = ",",
-    ) { request ->
-        """{"courseId":${request.courseId},"quantity":${request.quantity}}"""
-    }
+        val params = buildList {
+            addAll(targets.caseParams())
+            addAll(targets.inParams())
+            addAll(targets.caseParams())
+        }
 
-    companion object {
-        fun from(courseIds: Map<Long, Int>): ReserveSeatsCommand {
-            val requests = courseIds
-                .asSequence()
-                .filter { (_, quantity) -> quantity > 0 }
-                .map { (courseId, quantity) ->
-                    ReserveSeatRequest(
-                        courseId = courseId,
-                        quantity = quantity,
-                    )
-                }
-                .toList()
+        val updatedCount = jdbcTemplate.update(sql, *params.toTypedArray())
 
-            return ReserveSeatsCommand(requests)
+        if (updatedCount != targets.size) {
+            throw CourseInvalidStateException(
+                "강좌 좌석 반환에 실패했습니다. expected=${targets.size}, actual=$updatedCount",
+            )
         }
     }
-}
 
-private data class ReserveSeatRequest(
-    val courseId: Long,
-    val quantity: Int,
-)
+    @Language("SQL")
+    private fun reserveSeatsBulkSql(
+        caseSql: String,
+        inSql: String,
+    ): String =
+        """
+    UPDATE courses
+    SET seat_left_count =
+        seat_left_count -
+        CASE id
+            $caseSql
+            ELSE 0
+        END
+    WHERE id IN ($inSql)
+      AND status = ?
+      AND seat_left_count >=
+        CASE id
+            $caseSql
+            ELSE 0
+        END
+        """.trimIndent()
+
+    @Language("SQL")
+    private fun releaseSeatsBulkSql(
+        caseSql: String,
+        inSql: String,
+    ): String =
+        """
+    UPDATE courses
+    SET seat_left_count =
+        seat_left_count +
+        CASE id
+            $caseSql
+            ELSE 0
+        END
+    WHERE id IN ($inSql)
+      AND seat_left_count +
+        CASE id
+            $caseSql
+            ELSE 0
+        END <= capacity
+        """.trimIndent()
+
+    private fun Map<Long, Int>.toTargets(): List<Pair<Long, Int>> = filterValues { it > 0 }
+        .map { (courseId, count) -> courseId to count }
+
+    private fun List<Pair<Long, Int>>.caseSql(): String = joinToString(separator = "\n") {
+        "WHEN ? THEN ?"
+    }
+
+    private fun List<Pair<Long, Int>>.inSql(): String = joinToString(separator = ", ") {
+        "?"
+    }
+
+    private fun List<Pair<Long, Int>>.caseParams(): List<Any> = flatMap { (courseId, count) ->
+        listOf(courseId, count)
+    }
+
+    private fun List<Pair<Long, Int>>.inParams(): List<Any> = map { (courseId, _) -> courseId }
+}
