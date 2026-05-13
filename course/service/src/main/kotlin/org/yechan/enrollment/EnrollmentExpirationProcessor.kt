@@ -1,5 +1,6 @@
 package org.yechan.enrollment
 
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 interface EnrollmentExpirationProcessor {
@@ -9,10 +10,12 @@ interface EnrollmentExpirationProcessor {
     ): Map<Long, Int>
 }
 
+@Transactional(readOnly = true)
 open class EnrollmentExpirationService(
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
     private val courseBulkWriter: CourseBulkWriter,
 ) : EnrollmentExpirationProcessor {
+    @Transactional
     override fun expireAll(
         courseIds: Collection<Long>,
         now: LocalDateTime,
