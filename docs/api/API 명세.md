@@ -207,6 +207,7 @@ curl -X POST "http://localhost:8080/api/courses/1/close" \
     - 모집 중인 `OPEN` 상태의 강의에만 신청할 수 있습니다.
     - 수강 신청 성공 시 `Enrollment`를 `PENDING` 상태로 생성합니다.
     - 수강 신청 성공 시 `seatLeftCount`를 감소시킵니다.
+    - 정원이 가득 찬 경우 대기열에 등록하고 `WAITLISTED` 응답을 반환합니다.
     - 매핑: `EnrollmentController.enroll()`
     - 요청 예시:
 
@@ -272,6 +273,7 @@ curl -X GET "http://localhost:8080/api/enrollments/me" \
 - 강의 목록 조회의 `status` query parameter는 선택 값입니다.
 - `status` query parameter가 없으면 전체 강의를 조회합니다.
 - 수강 신청은 성공 시 `PENDING` 상태로 생성됩니다.
+- 수강 신청은 정원이 가득 차면 대기열 등록 응답을 반환합니다.
 - 결제 확정은 `PENDING -> CONFIRMED` 상태 변경으로 처리합니다.
 - 수강 취소는 `PENDING -> CANCELLED` 상태 변경으로 처리합니다.
 - `CONFIRMED` 상태의 수강 신청은 취소할 수 없습니다.
