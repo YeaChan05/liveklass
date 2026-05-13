@@ -58,6 +58,9 @@ args = ["/opt/homebrew/lib/node_modules/oh-my-codex/dist/mcp/memory-server.js"]
 enabled = true
 startup_timeout_sec = 5
 
+[mcp_servers.omx_memory.tools.notepad_read]
+approval_mode = "approve"
+
 # OMX Code Intelligence MCP Server (LSP diagnostics, AST search)
 [mcp_servers.omx_code_intel]
 command = "node"
@@ -65,7 +68,7 @@ args = ["/opt/homebrew/lib/node_modules/oh-my-codex/dist/mcp/code-intel-server.j
 enabled = true
 startup_timeout_sec = 10
 
-[mcp_servers.omx_code_intel.tools.lsp_document_symbols]
+[mcp_servers.omx_code_intel.tools.ast_grep_replace]
 approval_mode = "approve"
 
 # OMX Trace MCP Server (agent flow timeline & statistics)
@@ -81,9 +84,6 @@ command = "node"
 args = ["/opt/homebrew/lib/node_modules/oh-my-codex/dist/mcp/wiki-server.js"]
 enabled = true
 startup_timeout_sec = 5
-
-[mcp_servers.omx_wiki.tools.wiki_list]
-approval_mode = "approve"
 
 # OMX TUI StatusLine (Codex CLI v0.101.0+)
 [tui]
