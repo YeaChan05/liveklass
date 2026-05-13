@@ -13,5 +13,5 @@ interface CourseRepository {
 
     fun releaseSeatIfPossible(courseId: Long): Boolean
 
-    fun findAllOpendCoursesByIds(courseIds: Collection<Long>): List<CourseModel>
+    fun findAllOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseModel>
 }

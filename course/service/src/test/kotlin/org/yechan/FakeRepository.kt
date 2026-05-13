@@ -67,7 +67,7 @@ class FakeCourseRepository :
 
     override fun findAllByStatus(status: CourseStatus): List<CourseModel> = courses.values.filter { it.status == status }
 
-    override fun findAllOpendCoursesByIds(courseIds: Collection<Long>): List<CourseModel> = courses.values.filter {
+    override fun findAllOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseModel> = courses.values.filter {
         it.courseId in courseIds && it.status == CourseStatus.OPEN
     }
 

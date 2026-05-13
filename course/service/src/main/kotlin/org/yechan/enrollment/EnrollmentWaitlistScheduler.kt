@@ -16,7 +16,7 @@ open class EnrollmentWaitlistScheduler(
     open fun processWaitlists() {
         val courseIds = waitlistRepository.findCourseIds().ifEmpty { return }
 
-        val courses = courseRepository.findAllOpendCoursesByIds(courseIds)
+        val courses = courseRepository.findAllOpenedCoursesByIds(courseIds)
 
         val promotions = courses.flatMap { course ->
             val courseId = course.courseId ?: return@flatMap emptyList()
