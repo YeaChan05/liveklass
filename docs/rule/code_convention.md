@@ -194,7 +194,7 @@
 - 비즈니스 로직 포함 x
 - Bean 조립, 설정, 실행만 담당
 
-현재는 application-root만 runnable
+현재는 runnable application 모듈만 존재한다
 
 ---
 
