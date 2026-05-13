@@ -2,21 +2,26 @@ package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.yechan.FakeCourseRepository
+import org.yechan.FakeEnrollmentRepository
+import org.yechan.FakeEnrollmentWaitlistRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 
 class EnrollmentPaymentExpirationSchedulerTest {
-    private val useCase = FakeEnrollmentExpirationUseCase()
     private val clock = Clock.fixed(
         Instant.parse("2026-05-10T12:00:00Z"),
         ZoneId.of("Asia/Seoul"),
     )
 
+    val enrollmentRepository = FakeEnrollmentRepository()
     private val scheduler =
         EnrollmentPaymentExpirationScheduler(
-            enrollmentExpirationUseCase = useCase,
+            enrollmentRepository = enrollmentRepository,
+            courseRepository = FakeCourseRepository(),
+            waitlistRepository = FakeEnrollmentWaitlistRepository(),
             clock = clock,
         )
 
@@ -24,20 +29,11 @@ class EnrollmentPaymentExpirationSchedulerTest {
     fun `스케줄러는 현재 시간을 기준으로 결제 대기 만료 처리를 요청한다`() {
         scheduler.expirePaymentPendingEnrollments()
 
-        assertThat(useCase.calledCount).isEqualTo(1)
-        assertThat(useCase.requestedNow).isEqualTo(
-            LocalDateTime.of(2026, 5, 10, 21, 0, 0),
+        val expiredTargets = enrollmentRepository.findExpiredPaymentPendingTargets(
+            now = LocalDateTime.of(2026, 5, 10, 21, 0, 0),
+            limit = 100,
         )
-    }
-}
 
-private class FakeEnrollmentExpirationUseCase : EnrollmentExpirationUseCase {
-    var calledCount = 0
-    var requestedNow: LocalDateTime? = null
-
-    override fun expirePaymentPendingEnrollments(now: LocalDateTime): Int {
-        calledCount++
-        requestedNow = now
-        return 0
+        assertThat(expiredTargets).hasSize(0)
     }
 }
