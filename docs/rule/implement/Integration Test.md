@@ -6,11 +6,11 @@
 
 - **실제 환경과 유사하게**: 가능한 한 실제 인프라(MySQL, Redis)와 연동하여 테스트를 수행한다 이를 위해 `Testcontainers`를 활용한다
 - **격리된 테스트**: 각 테스트 메서드 실행 전후로 데이터베이스 상태를 초기화하여 테스트 간 간섭을 방지한다
-- **명확한 시나리오**: 단순 API 호출 검증을 넘어, 동시성 테스트나 복잡한 비즈니스 시나리오(이체 -> 알림 전달 등)를 검증한다
+- **명확한 시나리오**: 단순 API 호출 검증을 넘어, 동시성 테스트나 복잡한 비즈니스 시나리오를 검증한다
 
 #### 2. @SpringBootTest 활용
 
-전체 애플리케이션 컨텍스트를 로드하여 테스트를 수행한다 `application-root` 모듈의 `AggregateApplication`을 설정 클래스로 지정하여 모든 도메인 로직을 통합 검증한다
+전체 애플리케이션 컨텍스트를 로드하여 테스트를 수행한다 runnable application 모듈의 `Application` 클래스를 설정 클래스로 지정하여 모든 핵심 로직을 통합 검증한다
 
 ```kotlin
 @SpringBootTest(
@@ -26,7 +26,7 @@ class PostSpecs {
 
 #### 3. 동시성 및 비동기 검증
 
-이체와 같이 정밀한 수치 계산과 동시성 제어가 필요한 경우, `ExecutorService`와 `CountDownLatch`를 사용하여 실제 경합 상황을 재현하고 검증한다
+동시성 제어가 필요한 경우, `ExecutorService`와 `CountDownLatch`를 사용하여 실제 경합 상황을 재현하고 검증한다
 
 #### 4. 데이터 초기화
 
@@ -47,9 +47,9 @@ fun `property 값이 다르면 bean을 등록하지 않는다`() {
 }
 ```
 
-테스트 클래스명은 요청 엔드포인트 패키지를 기준으로 다음과같이 작명한다
+테스트 클래스명은 요청 엔드포인트 패키지를 기준으로 다음과 같이 작명한다
 
-예를들어 `POST /api/enrollment`는 다음과 같은 테스트 클래스에서 통합 테스트가 이루어진다
+예를 들어 `POST /api/enrollments`는 다음과 같은 테스트 클래스에서 통합 테스트가 이루어진다
 ```kotlin
 // application 모듈 내 integrationTest
 package com.example.enrollment
