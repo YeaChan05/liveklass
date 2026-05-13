@@ -5,6 +5,8 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.context.annotation.Import
 import org.yechan.course.CourseService
 import org.yechan.course.CourseUseCase
+import org.yechan.enrollment.EnrollmentExpirationProcessor
+import org.yechan.enrollment.EnrollmentExpirationService
 import org.yechan.enrollment.EnrollmentPaymentExpirationScheduler
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentUseCase
@@ -60,6 +62,13 @@ class ServiceBeanRegistrar :
             EnrollmentPaymentExpirationScheduler(
                 bean(),
                 bean(),
+                bean(),
+                bean(),
+            )
+        }
+
+        registerBean<EnrollmentExpirationProcessor> {
+            EnrollmentExpirationService(
                 bean(),
                 bean(),
             )

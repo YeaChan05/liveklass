@@ -2,8 +2,6 @@ package org.yechan.enrollment
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
-import org.yechan.course.CourseInvalidStateException
-import org.yechan.course.CourseRepository
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -11,7 +9,7 @@ private val log = KotlinLogging.logger {}
 
 open class EnrollmentPaymentExpirationScheduler(
     private val enrollmentRepository: EnrollmentRepository,
-    private val courseRepository: CourseRepository,
+    private val enrollmentExpirationProcessor: EnrollmentExpirationProcessor,
     private val waitlistRepository: EnrollmentWaitlistRepository,
     private val clock: Clock,
 ) {
@@ -21,24 +19,25 @@ open class EnrollmentPaymentExpirationScheduler(
         val targets =
             enrollmentRepository.findExpiredPaymentPendingTargets(now = now, limit = 100)
 
-        var expiredCount = 0
+        if (targets.isEmpty()) {
+            return
+        }
 
-        targets.forEach { target ->
-            enrollmentRepository.expirePaymentPendingIfExpired(
-                enrollmentId = target.enrollmentId,
+        val countsByCourseId =
+            enrollmentExpirationProcessor.expireAll(
+                courseIds = targets.map { it.courseId }.distinct(),
                 now = now,
-            ).also { if (!it) return@forEach }
+            )
 
-            courseRepository.releaseSeatIfPossible(target.courseId)
-                .also { if (!it) throw CourseInvalidStateException("만료된 수강 신청의 좌석을 반환할 수 없습니다.") }
-
-            waitlistRepository.clearSoldOut(target.courseId)
-
-            expiredCount++
+        val expiredCount = countsByCourseId.values.sum()
+        countsByCourseId.forEach { (courseId, _) ->
+            waitlistRepository.clearSoldOut(courseId)
         }
 
         if (expiredCount > 0) {
-            log.info { "등록 대기 중인 $expiredCount 개의 수강이 만료되었습니다." }
+            log.info {
+                "결제 대기 만료 처리 완료: ${expiredCount}건, ${countsByCourseId.size}개 강의의 매진 상태를 해제했습니다."
+            }
         }
     }
 }
