@@ -33,6 +33,7 @@
 - `PENDING` 상태는 `CONFIRMED` 상태로 변경될 수 있습니다.
 - `PENDING` 상태는 `CANCELLED` 상태로 변경될 수 있습니다.
 - `PENDING` 상태는 결제 대기 시간이 지나면 `EXPIRED` 상태로 변경될 수 있습니다.
+- `PENDING` 상태의 정기 만료 처리는 `EnrollmentExpirationProcessor`가 담당하고, 스케줄러가 이를 주기적으로 호출합니다.
 - `CONFIRMED` 상태의 `Enrollment`는 취소되거나 만료될 수 없습니다.
 - `CANCELLED` 상태의 `Enrollment`는 다시 변경될 수 없습니다.
 - `EXPIRED` 상태의 `Enrollment`는 다시 변경될 수 없습니다.
