@@ -41,3 +41,4 @@ graphify-out/
 .codex/*
 **/logs/
 k6/tokens.json
+.github/git-commit-instructions.md
