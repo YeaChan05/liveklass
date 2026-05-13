@@ -9,6 +9,7 @@ import org.yechan.enrollment.EnrollmentExpirationProcessor
 import org.yechan.enrollment.EnrollmentExpirationService
 import org.yechan.enrollment.EnrollmentPaymentExpirationScheduler
 import org.yechan.enrollment.EnrollmentService
+import org.yechan.enrollment.EnrollmentTransactionService
 import org.yechan.enrollment.EnrollmentUseCase
 import org.yechan.enrollment.EnrollmentWaitlistScheduler
 import org.yechan.member.MemberAuthService
@@ -29,6 +30,12 @@ class ServiceBeanRegistrar :
             )
         }
 
+        registerBean<EnrollmentTransactionService> {
+            EnrollmentTransactionService(
+                bean(),
+                bean(),
+            )
+        }
         registerBean<EnrollmentUseCase> {
             EnrollmentService(
                 bean(),
