@@ -6,7 +6,7 @@ import { SharedArray } from 'k6/data';
 
 http.setResponseCallback(expectedStatuses(200, 201, 202, 400, 409));
 
-const TOKEN_PATH = __ENV.TOKEN_PATH || './k6/tokens.json';
+const TOKEN_PATH = __ENV.TOKEN_PATH || '../tokens.json';
 
 const applicantTokens = new SharedArray('applicant tokens', function () {
   return JSON.parse(open(TOKEN_PATH));
@@ -47,8 +47,8 @@ export const options = {
   },
 
   thresholds: {
-    refill_success: [`count==${CANCEL_COUNT}`],
-    refill_failed: [`count==${REFILL_APPLICANT_COUNT - CANCEL_COUNT}`],
+    refill_success: [`count==${REFILL_APPLICANT_COUNT}`],
+    refill_failed: ['count==0'],
     'http_req_duration{expected_response:true}': ['p(95)<20000'],
   },
 };
@@ -61,6 +61,8 @@ export function setup() {
         `tokens are not enough. tokenCount=${applicantTokens.length}, required=${COURSE_CAPACITY + REFILL_APPLICANT_COUNT}`,
     );
   }
+
+  assertApplicantTokenUsable(applicantTokens[0]);
 
   const creatorEmail = `creator-${testId}@test.com`;
   const creatorPassword = 'password1234';
@@ -396,6 +398,39 @@ function extractEnrollmentIdAsString(body) {
   }
 
   return matched[1];
+}
+
+function assertApplicantTokenUsable(token) {
+  if (!token) {
+    fail('first applicant token is missing');
+  }
+
+  const res = http.get(`${BASE_URL}/api/enrollments/me`, {
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    },
+    tags: {
+      name: 'GET /api/enrollments/me',
+    },
+  });
+
+  const success = res.status === 200;
+
+  check(res, {
+    '수강생 토큰 사전 검증 성공': () => success,
+  });
+
+  if (!success) {
+    console.error('applicant token preflight failed');
+    console.error(`status=${res.status}`);
+    console.error(`body=${res.body}`);
+
+    fail(
+        'applicant token is not accepted by the running application. ' +
+        'Regenerate k6/tokens.json from the same application/database before running this scenario.',
+    );
+  }
 }
 
 function parseJsonOrFail(res, context) {
