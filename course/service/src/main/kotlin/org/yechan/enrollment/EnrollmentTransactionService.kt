@@ -5,6 +5,8 @@ import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
 import org.yechan.course.EnrollmentNotFoundException
+import java.time.Duration
+import java.time.LocalDateTime
 
 interface EnrollmentUseCase {
     fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult
@@ -13,7 +15,11 @@ interface EnrollmentUseCase {
 
     fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
 
+    fun cancelWaitlist(command: EnrollmentWaitlistCommand)
+
     fun getMyEnrollments(memberId: Long): List<EnrollmentResult>
+
+    fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult>
 }
 
 sealed interface EnrollmentEnrollTransactionResult {
@@ -33,6 +39,7 @@ data class EnrollmentCancelResult(
 class EnrollmentTransactionService(
     private val courseRepository: CourseRepository,
     private val enrollmentRepository: EnrollmentRepository,
+    private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) {
     @Transactional
     fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
@@ -43,11 +50,14 @@ class EnrollmentTransactionService(
             return EnrollmentEnrollTransactionResult.SoldOut
         }
 
+        val paymentPendingStartedAt = LocalDateTime.now()
         val enrollment = EnrollmentModelData(
             enrollmentId = null,
             courseId = courseId,
             memberId = memberId,
             status = EnrollmentStatus.PENDING,
+            paymentPendingStartedAt = paymentPendingStartedAt,
+            paymentPendingExpiresAt = paymentPendingStartedAt.plus(paymentPendingExpiresIn),
         )
 
         return EnrollmentEnrollTransactionResult.Enrolled(

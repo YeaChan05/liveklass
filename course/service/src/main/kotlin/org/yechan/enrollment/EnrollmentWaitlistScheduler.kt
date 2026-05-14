@@ -4,12 +4,15 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.transaction.annotation.Transactional
 import org.yechan.course.CourseRepository
 import org.yechan.course.CourseStatus
+import java.time.Duration
+import java.time.LocalDateTime
 
 open class EnrollmentWaitlistScheduler(
     private val waitlistRepository: EnrollmentWaitlistRepository,
     private val courseRepository: CourseRepository,
     private val courseBulkWriter: CourseBulkWriter,
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
+    private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) {
     @Scheduled(fixedDelay = 5_000)
     @Transactional
@@ -21,6 +24,7 @@ open class EnrollmentWaitlistScheduler(
         val promotions = courses.flatMap { course ->
             val courseId = course.courseId ?: return@flatMap emptyList()
             val promotableCount = course.seatLeftCount
+            val now = LocalDateTime.now()
 
             if (course.status != CourseStatus.OPEN || promotableCount <= 0) {
                 return@flatMap emptyList()
@@ -32,6 +36,8 @@ open class EnrollmentWaitlistScheduler(
                 EnrollmentModelData(
                     courseId = courseId,
                     memberId = waitlist.memberId,
+                    paymentPendingStartedAt = now,
+                    paymentPendingExpiresAt = now.plus(paymentPendingExpiresIn),
                 )
             }
         }.ifEmpty { return }
@@ -42,13 +48,6 @@ open class EnrollmentWaitlistScheduler(
 
         courseBulkWriter.reserveSeatsBulk(reservedCountsByCourseId)
 
-        val enrollments = promotions.map { promotion ->
-            EnrollmentModelData(
-                courseId = promotion.courseId,
-                memberId = promotion.memberId,
-            )
-        }
-
-        enrollmentBulkWriter.saveAllBulk(enrollments)
+        enrollmentBulkWriter.saveAllBulk(promotions)
     }
 }
