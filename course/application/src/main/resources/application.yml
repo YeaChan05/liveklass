@@ -42,8 +42,8 @@ management:
 
 auth:
   token:
-    access-expires-in: 3600 # 1 hour
-    refresh-expires-in: 86400 # 24 hours
+    access-expires-in: ${AUTH_TOKEN_ACCESS_EXPIRES_IN:3600} # 1 hour
+    refresh-expires-in: ${AUTH_TOKEN_REFRESH_EXPIRES_IN:86400} # 24 hours
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
 
 enrollment:
