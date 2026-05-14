@@ -25,11 +25,10 @@ class EnrollmentWaitlistRedisRepository(
 
     override fun pop(courseId: Long): EnrollmentWaitlistEntry? {
         val key = EnrollmentWaitlistRedisKey.byCourseId(courseId)
-        val member = zSetOperations.range(key.value, 0, 0)
-            ?.firstOrNull()
+        val member = zSetOperations.popMin(key.value)
+            ?.value
             ?: return null
 
-        zSetOperations.remove(key.value, member)
         cleanupCourseId(courseId)
 
         return EnrollmentWaitlistRedisValue.deserialize(member).toDomain(courseId)

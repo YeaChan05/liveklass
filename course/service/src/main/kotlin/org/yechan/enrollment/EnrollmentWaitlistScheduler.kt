@@ -21,6 +21,7 @@ open class EnrollmentWaitlistScheduler(
         val courseIds = waitlistRepository.findCourseIds().ifEmpty { return }
 
         val courses = courseRepository.findAllOpenedCoursesByIds(courseIds)
+        val poppedWaitlists = mutableListOf<EnrollmentWaitlistEntry>()
 
         val promotions = courses.flatMap { course ->
             val courseId = course.courseId ?: return@flatMap emptyList()
@@ -33,6 +34,7 @@ open class EnrollmentWaitlistScheduler(
 
             (1..promotableCount).mapNotNull {
                 val waitlist = waitlistRepository.pop(courseId) ?: return@mapNotNull null
+                poppedWaitlists += waitlist
 
                 EnrollmentModelData(
                     enrollmentId = TSID.Factory.getTsid().toLong(),
@@ -48,8 +50,23 @@ open class EnrollmentWaitlistScheduler(
             .groupingBy { it.courseId }
             .eachCount()
 
-        courseBulkWriter.reserveSeatsBulk(reservedCountsByCourseId)
+        try {
+            courseBulkWriter.reserveSeatsBulk(reservedCountsByCourseId)
+            enrollmentBulkWriter.saveAllBulk(promotions)
+        } catch (e: RuntimeException) {
+            restoreWaitlists(poppedWaitlists)
+            throw e
+        }
+    }
 
-        enrollmentBulkWriter.saveAllBulk(promotions)
+    private fun restoreWaitlists(waitlists: List<EnrollmentWaitlistEntry>) {
+        waitlists.forEach { waitlist ->
+            waitlistRepository.enqueue(
+                courseId = waitlist.courseId,
+                memberId = waitlist.memberId,
+                requestedAt = waitlist.requestedAt,
+            )
+            waitlistRepository.markSoldOut(waitlist.courseId)
+        }
     }
 }
