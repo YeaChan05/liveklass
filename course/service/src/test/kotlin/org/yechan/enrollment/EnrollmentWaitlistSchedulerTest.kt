@@ -1,6 +1,7 @@
 package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
@@ -130,6 +131,39 @@ class EnrollmentWaitlistSchedulerTest {
         assertThat(promotedEnrollments).hasSize(1)
         assertThat(promotedEnrollments.single().status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
+    }
+
+    @Test
+    fun `승격 중 좌석 예약 실패 시 pop된 대기자를 복구한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
+        waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        val failingScheduler = EnrollmentWaitlistScheduler(
+            waitlistRepository,
+            courseRepository,
+            object : CourseBulkWriter {
+                override fun reserveSeatsBulk(courseIds: Map<Long, Int>) {
+                    throw IllegalStateException("좌석 예약 실패")
+                }
+
+                override fun releaseSeatsBulk(courseIds: Map<Long, Int>) = Unit
+            },
+            enrollmentRepository,
+        )
+
+        assertThatThrownBy { failingScheduler.processWaitlists() }
+            .isInstanceOf(IllegalStateException::class.java)
+
+        assertThat(waitlistRepository.findByMemberId(2L)).hasSize(1)
+        assertThat(waitlistRepository.findByMemberId(3L)).hasSize(1)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+        assertThat(enrollmentRepository.findByMemberId(2L)).isEmpty()
     }
 
     @Test
