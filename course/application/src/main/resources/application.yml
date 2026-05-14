@@ -16,6 +16,7 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 management:
@@ -44,6 +45,10 @@ auth:
     access-expires-in: 3600 # 1 hour
     refresh-expires-in: 86400 # 24 hours
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
+
+enrollment:
+  payment-pending:
+    expires-in: ${ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN:10m}
 
 load-test:
   member-token-generator:
