@@ -47,8 +47,9 @@ class MemberTokenGenerator(
 
         val members = createSeedMembers()
         batchInsertMembers(members)
+        val persistedMembers = findPersistedSeedMembers(members)
 
-        val tokens = members.map { member ->
+        val tokens = persistedMembers.map { member ->
             val token = tokenGenerator.generate(
                 memberId = member.id,
                 roles = setOf(properties.role),
@@ -127,6 +128,41 @@ class MemberTokenGenerator(
             ps.setString(6, member.status)
             ps.setObject(7, now)
             ps.setObject(8, now)
+        }
+    }
+
+    private fun findPersistedSeedMembers(members: List<SeedMember>): List<SeedMember> {
+        val persistedMembers =
+            jdbcTemplate
+                .query(
+                    """
+                    SELECT
+                        id,
+                        email,
+                        password_hash,
+                        name,
+                        role,
+                        status
+                    FROM members
+                    WHERE email LIKE ?
+                    """.trimIndent(),
+                    { rs, _ ->
+                        SeedMember(
+                            id = rs.getLong("id"),
+                            email = rs.getString("email"),
+                            passwordHash = rs.getString("password_hash"),
+                            name = rs.getString("name"),
+                            role = rs.getString("role"),
+                            status = rs.getString("status"),
+                        )
+                    },
+                    "${properties.emailPrefix}-%@${properties.emailDomain}",
+                )
+                .associateBy(SeedMember::email)
+
+        return members.map { member ->
+            persistedMembers[member.email]
+                ?: error("seed member is missing after upsert. email=${member.email}")
         }
     }
 
