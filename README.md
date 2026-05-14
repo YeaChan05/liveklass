@@ -48,10 +48,13 @@
 
 E2E 정합성 테스트 실행
 ```bash
-MEMBER_TOKEN_GENERATOR_ENABLED=true \  
-MEMBER_TOKEN_GENERATOR_COUNT=5000 \  
-MEMBER_TOKEN_GENERATOR_OUTPUT_PATH=./k6/tokens.json \  
-./gradlew :application-root:bootRun
+MEMBER_TOKEN_GENERATOR_ENABLED=true \
+MEMBER_TOKEN_GENERATOR_COUNT=5000 \
+MEMBER_TOKEN_GENERATOR_OUTPUT_PATH=./k6/tokens.json \
+AUTH_TOKEN_ACCESS_EXPIRES_IN=7200 \
+ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN=60s \
+ENROLLMENT_PAYMENT_EXPIRATION_FIXED_DELAY_MS=5000 \
+./gradlew :course:application:bootRun
 ```
 애플리케이션 실행 후 k6가 실행 가능한 위치에서 아래 명령어로 정합성 검증 테스트를 실행할 수 있습니다.
 ```bash
@@ -70,13 +73,19 @@ k6 run k6/scenarios/concurrent-enroll-one-course.js
 ```
 
 ```bash
-# 취소 + 수강 신청 시나리오 실행
+# 결제 대기 만료 후 대기자 재신청/확정 시나리오 실행
 BASE_URL=http://localhost:8080 \
 API_VERSION=v1 \
 COURSE_CAPACITY=100 \
 APPLICANT_COUNT=5000 \
-VUS=1000 \
-SETUP_TIMEOUT=1m \
+INITIAL_CONFIRM_COUNT=50 \
+EXPIRE_PENDING_COUNT=50 \
+REFILL_APPLICANT_COUNT=50 \
+WAIT_BEFORE_REFILL_SECONDS=20 \
+REFILL_POLL_TIMEOUT_SECONDS=30 \
+REFILL_POLL_INTERVAL_SECONDS=1 \
+VUS=50 \
+SETUP_TIMEOUT=5m \
 TEARDOWN_TIMEOUT=1m \
 SCENARIO_MAX_DURATION=3m \
 GRACEFUL_STOP=30s \
@@ -84,7 +93,79 @@ TOKEN_PATH=../tokens.json \
 k6 run k6/scenarios/concurrent-enroll-after-cancel-one-course.js
 ```
 
+```bash
+# 결제 대기 만료 후 1차 재신청을 다시 만료시키고 2차로 재확정하는 시나리오 실행
+BASE_URL=http://localhost:8080 \
+API_VERSION=v1 \
+COURSE_CAPACITY=100 \
+APPLICANT_COUNT=5000 \
+INITIAL_CONFIRM_COUNT=50 \
+EXPIRE_PENDING_COUNT=50 \
+FIRST_REFILL_APPLICANT_COUNT=50 \
+SECOND_REFILL_APPLICANT_COUNT=50 \
+WAIT_BEFORE_FIRST_REFILL_SECONDS=20 \
+WAIT_BETWEEN_REFILL_WAVES_SECONDS=70 \
+FIRST_REFILL_POLL_TIMEOUT_SECONDS=30 \
+SECOND_REFILL_POLL_TIMEOUT_SECONDS=30 \
+VUS=100 \
+SETUP_TIMEOUT=5m \
+TEARDOWN_TIMEOUT=1m \
+SCENARIO_MAX_DURATION=5m \
+GRACEFUL_STOP=30s \
+TOKEN_PATH=../tokens.json \
+k6 run k6/scenarios/concurrent-enroll-double-expiration-one-course.js
+```
+
+```bash
+# 더 많은 인원과 더 복잡한 3단계 만료/재신청 시나리오 실행
+BASE_URL=http://localhost:8080 \
+API_VERSION=v1 \
+COURSE_CAPACITY=100 \
+APPLICANT_COUNT=10000 \
+INITIAL_CONFIRM_COUNT=50 \
+EXPIRE_PENDING_COUNT=50 \
+FIRST_WAVE_APPLICANT_COUNT=100 \
+SECOND_WAVE_APPLICANT_COUNT=100 \
+THIRD_WAVE_APPLICANT_COUNT=100 \
+WAIT_BEFORE_FIRST_REFILL_SECONDS=20 \
+WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS=140 \
+WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS=140 \
+FIRST_WAVE_POLL_TIMEOUT_SECONDS=30 \
+SECOND_WAVE_POLL_TIMEOUT_SECONDS=30 \
+THIRD_WAVE_POLL_TIMEOUT_SECONDS=30 \
+VUS=150 \
+SETUP_TIMEOUT=8m \
+TEARDOWN_TIMEOUT=1m \
+SCENARIO_MAX_DURATION=12m \
+GRACEFUL_STOP=30s \
+TOKEN_PATH=../tokens.json \
+k6 run k6/scenarios/concurrent-enroll-triple-wave-one-course.js
+```
+
+```bash
+# 결제 대기 취소 시나리오 실행
+BASE_URL=http://localhost:8080 \
+API_VERSION=v1 \
+COURSE_CAPACITY=5000 \
+APPLICANT_COUNT=5000 \
+VUS=1000 \
+ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN=30s \
+SETUP_TIMEOUT=5m \
+TEARDOWN_TIMEOUT=1m \
+SCENARIO_MAX_DURATION=3m \
+GRACEFUL_STOP=30s \
+TOKEN_PATH=../tokens.json \
+k6 run k6/scenarios/concurrent-cancel-pending-one-course.js
+```
+
 - 정합성 검증 테스트를 진행하는 경우 MEMBER_TOKEN_GENERATOR_ENABLED=true 환경 변수를 설정하여 토큰 생성 기능을 활성화해야 합니다.
+- k6 토큰은 애플리케이션 기동 시 생성되므로 오래된 `k6/tokens.json`을 재사용하지 말고 테스트 직전에 애플리케이션을 재기동해 다시 생성합니다.
+- 더 큰 시나리오를 돌릴 때는 `MEMBER_TOKEN_GENERATOR_COUNT`도 `APPLICANT_COUNT`에 맞춰 늘려야 합니다. 위 1만 명 시나리오는 `MEMBER_TOKEN_GENERATOR_COUNT=10000`이 필요합니다.
+- 결제 대기 만료 후 대기자 재신청/확정 시나리오는 대기 시간이 길기 때문에 애플리케이션 실행 시 `AUTH_TOKEN_ACCESS_EXPIRES_IN`을 충분히 길게 설정합니다.
+- 결제 대기 만료 시간을 바꿔 테스트하려면 애플리케이션 실행 시 `ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN` 값을 설정합니다. 기본값은 `10m`입니다.
+- 결제 대기 만료 후 대기자 재신청/확정 시나리오는 애플리케이션의 만료 스케줄러가 동작한 뒤 실행되어야 하므로 `WAIT_BEFORE_REFILL_SECONDS`는 첫 결제 대기 만료와 대기자 승격이 끝난 직후가 되도록 설정합니다. 승격된 대기자도 다시 결제 대기 만료 대상이므로 너무 길게 잡으면 EXPIRED가 됩니다. `ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN=60s`, `ENROLLMENT_PAYMENT_EXPIRATION_FIXED_DELAY_MS=5000` 기준 권장값은 `WAIT_BEFORE_REFILL_SECONDS=20`, `REFILL_POLL_TIMEOUT_SECONDS=30`입니다. 5000명 setup 중 만료가 먼저 발생하면 초기 대기열 적재 단계에서 PENDING 승격이 섞여 실패합니다.
+- 더 강한 검증이 필요하면 `concurrent-enroll-double-expiration-one-course.js`를 사용합니다. 이 시나리오는 첫 번째 재신청을 다시 만료시킨 뒤 두 번째 재신청을 확정하므로 `WAIT_BEFORE_FIRST_REFILL_SECONDS=20`, `WAIT_BETWEEN_REFILL_WAVES_SECONDS=70`, `FIRST_REFILL_POLL_TIMEOUT_SECONDS=30`, `SECOND_REFILL_POLL_TIMEOUT_SECONDS=30` 조합이 맞아야 합니다.
+- 가장 강한 검증은 `concurrent-enroll-triple-wave-one-course.js`입니다. 이 시나리오는 1만 명 중 300명을 3단계로 다시 몰아넣고 1차와 2차는 만료까지 흘려보낸 뒤 3차만 확정합니다. `MEMBER_TOKEN_GENERATOR_COUNT=10000`, `WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS=140`, `WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS=140`이 필요합니다.
 ## 미구현 / 제약사항
 
 - 요구사항에 따라 외부 결제 시스템은 연동하지 않았습니다. 결제 확정은 실제 결제 승인 대신 수강 신청 상태를 `CONFIRMED`로 변경하는 방식으로 처리했습니다.
@@ -92,6 +173,8 @@ k6 run k6/scenarios/concurrent-enroll-after-cancel-one-course.js
 - `CONFIRMED` 상태의 수강 신청은 취소할 수 없습니다.
 - `CANCELLED` 또는 `EXPIRED` 상태 이후 같은 강의에 다시 신청하는 기능은 지원하지 않습니다.
 - 대기열 등록은 지원하지만, 대기열 사용자에게 자동으로 입장 권한을 부여하거나 알림을 보내는 기능은 구현하지 않았습니다.
+- `GET /api/enrollments/waitlist/me`는 현재 로그인한 회원의 대기열 상태를 SSE로 조회합니다.
+- `DELETE /api/enrollments/waitlist/{courseId}`로 현재 로그인한 회원의 해당 강의 대기열을 취소할 수 있습니다.
 - 강의 수강 기간에 따라 자동으로 모집을 시작하거나 마감하지 않습니다. 모집 시작과 마감은 `CREATOR`가 직접 수행합니다.
 - 관리자에 의한 강의 수정, 강제 취소, 회원 관리 기능은 과제 범위에 명시되지 않아 포함하지 않았습니다.
 
