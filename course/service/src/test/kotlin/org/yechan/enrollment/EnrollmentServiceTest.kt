@@ -41,7 +41,7 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
         val changedCourse = courseService.getCourse(course.courseId)
 
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
@@ -49,7 +49,7 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `남은 좌석이 없으면 수강 신청은 실패한다`() {
+    fun `남은 좌석이 없으면 수강 신청은 대기열에 등록된다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
@@ -57,11 +57,15 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("강의 정원을 초과할 수 없습니다.")
+
+        assertThat(waitlisted).isEqualTo(
+            EnrollmentEnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 3L,
+            ),
+        )
 
         assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
@@ -88,7 +92,7 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId)).enrollment
 
         val confirmed =
             service.confirmEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
@@ -108,7 +112,7 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId)).enrollment
 
         val cancelled =
             service.cancelEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
@@ -138,7 +142,7 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
 
         assertThatThrownBy {
             service.confirmEnrollment(
@@ -158,7 +162,7 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
         service.confirmEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
@@ -185,7 +189,7 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
         service.cancelEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
@@ -257,7 +261,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         service.cancelEnrollment(
             EnrollmentStatusCommand(
@@ -286,7 +290,7 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
 
         val beforeCancelCourse = courseService.getCourse(course.courseId)
 
@@ -309,7 +313,7 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
 
         val confirmed =
             service.confirmEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
@@ -341,7 +345,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         assertThatThrownBy {
             service.cancelEnrollment(
@@ -384,17 +388,22 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(
                 EnrollCourseCommand(
                     memberId = 3L,
                     courseId = course.courseId,
                 ),
             )
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
+
+        assertThat(waitlisted).isEqualTo(
+            EnrollmentEnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 3L,
+            ),
+        )
 
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
 
@@ -417,23 +426,27 @@ class EnrollmentServiceTest {
 
         waitlistRepository.markSoldOut(course.courseId)
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(
                 EnrollCourseCommand(
                     memberId = 2L,
                     courseId = course.courseId,
                 ),
             )
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("강의 정원을 초과할 수 없습니다.")
+
+        assertThat(waitlisted).isEqualTo(
+            EnrollmentEnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 2L,
+            ),
+        )
 
         val changedCourse = courseService.getCourse(course.courseId)
-        val waitlisted = waitlistRepository.pop(course.courseId)
+        val popped = waitlistRepository.pop(course.courseId)
         val enrollments = service.getMyEnrollments(2L)
 
         assertThat(changedCourse.seatLeftCount).isEqualTo(2)
-        assertThat(waitlisted?.memberId).isEqualTo(2L)
+        assertThat(popped?.memberId).isEqualTo(2L)
         assertThat(enrollments).isEmpty()
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
     }
@@ -450,7 +463,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         val confirmed = service.confirmEnrollment(
             EnrollmentStatusCommand(
