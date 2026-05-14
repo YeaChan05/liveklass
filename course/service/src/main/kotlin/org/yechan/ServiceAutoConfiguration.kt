@@ -2,12 +2,14 @@ package org.yechan
 
 import org.springframework.beans.factory.BeanRegistrarDsl
 import org.springframework.boot.autoconfigure.AutoConfiguration
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Import
 import org.yechan.course.CourseService
 import org.yechan.course.CourseUseCase
 import org.yechan.enrollment.EnrollmentExpirationProcessor
 import org.yechan.enrollment.EnrollmentExpirationService
 import org.yechan.enrollment.EnrollmentPaymentExpirationScheduler
+import org.yechan.enrollment.EnrollmentPaymentPendingProperties
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentTransactionService
 import org.yechan.enrollment.EnrollmentUseCase
@@ -17,6 +19,7 @@ import org.yechan.member.MemberAuthUseCase
 import java.time.Clock
 
 @Import(ServiceBeanRegistrar::class)
+@EnableConfigurationProperties(EnrollmentPaymentPendingProperties::class)
 @AutoConfiguration
 class ServiceAutoConfiguration
 
@@ -34,6 +37,7 @@ class ServiceBeanRegistrar :
             EnrollmentTransactionService(
                 bean(),
                 bean(),
+                bean<EnrollmentPaymentPendingProperties>().expiresIn,
             )
         }
         registerBean<EnrollmentUseCase> {
@@ -49,6 +53,7 @@ class ServiceBeanRegistrar :
                 bean(),
                 bean(),
                 bean(),
+                bean<EnrollmentPaymentPendingProperties>().expiresIn,
             )
         }
 
@@ -82,6 +87,6 @@ class ServiceBeanRegistrar :
         }
 
         registerBean<Clock> {
-            Clock.systemUTC()
+            Clock.systemDefaultZone()
         }
     })
