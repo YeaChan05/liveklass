@@ -10,7 +10,6 @@ interface EnrollmentExpirationProcessor {
     ): Map<Long, Int>
 }
 
-@Transactional(readOnly = true)
 open class EnrollmentExpirationService(
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
     private val courseBulkWriter: CourseBulkWriter,
