@@ -42,5 +42,18 @@ private fun EnrollmentResult.toResponse(): EnrollmentResponse = EnrollmentRespon
     enrollmentId = enrollmentId,
     courseId = courseId,
     memberId = memberId,
-    status = status,
+    status = status.toResponseStatus(),
 )
+
+private fun EnrollmentEnrollResult.toResponse(): EnrollmentResponse = when (this) {
+    is EnrollmentEnrollResult.Enrolled -> enrollment.toResponse()
+
+    is EnrollmentEnrollResult.Waitlisted -> EnrollmentResponse(
+        enrollmentId = null,
+        courseId = courseId,
+        memberId = memberId,
+        status = EnrollmentResponseStatus.WAITLISTED,
+    )
+}
+
+private fun EnrollmentStatus.toResponseStatus(): EnrollmentResponseStatus = EnrollmentResponseStatus.valueOf(name)
