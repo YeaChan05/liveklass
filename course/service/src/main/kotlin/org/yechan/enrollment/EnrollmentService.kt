@@ -14,6 +14,12 @@ sealed interface EnrollmentEnrollResult {
     ) : EnrollmentEnrollResult
 }
 
+data class EnrollmentWaitlistResult(
+    val courseId: Long,
+    val memberId: Long,
+    val requestedAt: Instant,
+)
+
 open class EnrollmentService(
     private val enrollmentTransactionService: EnrollmentTransactionService,
     private val enrollmentRepository: EnrollmentRepository,
@@ -48,8 +54,22 @@ open class EnrollmentService(
         return result.enrollment
     }
 
+    override fun cancelWaitlist(command: EnrollmentWaitlistCommand) {
+        waitlistRepository.remove(command.courseId, command.memberId)
+    }
+
     @Transactional(readOnly = true)
     override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+
+    @Transactional(readOnly = true)
+    override fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult> = waitlistRepository.findByMemberId(memberId)
+        .map {
+            EnrollmentWaitlistResult(
+                courseId = it.courseId,
+                memberId = it.memberId,
+                requestedAt = it.requestedAt,
+            )
+        }
 
     private fun enqueueWaitlist(
         courseId: Long,
