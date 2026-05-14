@@ -10,6 +10,11 @@ data class EnrollmentStatusCommand(
     val enrollmentId: Long,
 )
 
+data class EnrollmentWaitlistCommand(
+    val memberId: Long,
+    val courseId: Long,
+)
+
 data class EnrollmentResult(
     val enrollmentId: Long,
     val courseId: Long,
