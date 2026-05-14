@@ -305,10 +305,16 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
 
         if (queue.isEmpty()) {
             entries.remove(courseId)
+            soldOutCourseIds -= courseId
         }
 
         return first
     }
+
+    override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = entries.values
+        .flatten()
+        .filter { it.memberId == memberId }
+        .sortedBy { it.requestedAt }
 
     override fun remove(
         courseId: Long,
@@ -318,6 +324,7 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
 
         if (entries[courseId].isNullOrEmpty()) {
             entries.remove(courseId)
+            soldOutCourseIds -= courseId
         }
     }
 
