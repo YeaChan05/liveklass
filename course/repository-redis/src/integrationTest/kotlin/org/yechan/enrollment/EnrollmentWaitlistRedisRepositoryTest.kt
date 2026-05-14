@@ -52,6 +52,39 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
     }
 
     @Test
+    fun `마지막 대기열이 제거되면 매진 표시도 해제된다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
+        repository.markSoldOut(1L)
+
+        repository.remove(1L, 10L)
+
+        assertThat(repository.isSoldOut(1L)).isTrue()
+
+        repository.remove(1L, 20L)
+
+        assertThat(repository.findCourseIds()).isEmpty()
+        assertThat(repository.isSoldOut(1L)).isFalse()
+    }
+
+    @Test
+    fun `회원 아이디로 대기열을 조회하면 등록 순서대로 반환한다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(2L, 10L, Instant.parse("2026-01-01T00:00:01Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:02Z"))
+
+        val result = repository.findByMemberId(10L)
+
+        assertThat(result).hasSize(2)
+        assertThat(result[0].courseId).isEqualTo(1L)
+        assertThat(result[0].memberId).isEqualTo(10L)
+        assertThat(result[0].requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"))
+        assertThat(result[1].courseId).isEqualTo(2L)
+        assertThat(result[1].memberId).isEqualTo(10L)
+        assertThat(result[1].requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:01Z"))
+    }
+
+    @Test
     fun `존재하지 않는 대기열을 pop하면 null을 반환한다`() {
         // Arrange
         // do nothing
@@ -167,12 +200,14 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
             memberId = 10L,
             requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
         )
+        repository.markSoldOut(1L)
 
         // Act
         repository.pop(1L)
 
         // Assert
         assertThat(repository.findCourseIds()).isEmpty()
+        assertThat(repository.isSoldOut(1L)).isFalse()
     }
 
     @Test

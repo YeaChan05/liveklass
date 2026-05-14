@@ -35,6 +35,17 @@ class EnrollmentWaitlistRedisRepository(
         return EnrollmentWaitlistRedisValue.deserialize(member).toDomain(courseId)
     }
 
+    override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = findCourseIds()
+        .flatMap { courseId ->
+            zSetOperations.range(EnrollmentWaitlistRedisKey.byCourseId(courseId).value, 0, -1)
+                .orEmpty()
+                .mapNotNull { serialized ->
+                    EnrollmentWaitlistRedisValue.deserialize(serialized).toDomain(courseId)
+                }
+        }
+        .filter { it.memberId == memberId }
+        .sortedBy { it.requestedAt }
+
     override fun remove(
         courseId: Long,
         memberId: Long,
@@ -78,6 +89,7 @@ class EnrollmentWaitlistRedisRepository(
         if (zSetOperations.range(key.value, 0, 0).isNullOrEmpty()) {
             redisTemplate.delete(key.value)
             zSetOperations.remove(EnrollmentWaitlistRedisKey.courseIds().value, courseId.toString())
+            clearSoldOut(courseId)
         }
     }
 }
