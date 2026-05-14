@@ -260,6 +260,28 @@ curl -X GET "http://localhost:8080/api/enrollments/me" \
   -H "Authorization: Bearer classmate-access-token-value"
 ```
 
+- [`GET /api/enrollments/waitlist/me`](/course/api/src/main/kotlin/org/yechan/enrollment/EnrollmentController.kt)
+    - 현재 로그인한 회원의 대기열 상태를 SSE로 조회합니다.
+    - 매핑: `EnrollmentController.getMyWaitlist()`
+    - 요청 예시:
+
+```bash
+curl -X GET "http://localhost:8080/api/enrollments/waitlist/me" \
+  -H "X-API-Version: v1" \
+  -H "Authorization: Bearer classmate-access-token-value"
+```
+
+- [`DELETE /api/enrollments/waitlist/{courseId}`](/course/api/src/main/kotlin/org/yechan/enrollment/EnrollmentController.kt)
+    - 현재 로그인한 회원의 해당 강의 대기열을 취소합니다.
+    - 매핑: `EnrollmentController.cancelWaitlist()`
+    - 요청 예시:
+
+```bash
+curl -X DELETE "http://localhost:8080/api/enrollments/waitlist/1" \
+  -H "X-API-Version: v1" \
+  -H "Authorization: Bearer classmate-access-token-value"
+```
+
 ---
 
 ### 참고 사항
@@ -274,6 +296,7 @@ curl -X GET "http://localhost:8080/api/enrollments/me" \
 - `status` query parameter가 없으면 전체 강의를 조회합니다.
 - 수강 신청은 성공 시 `PENDING` 상태로 생성됩니다.
 - 수강 신청은 정원이 가득 차면 대기열 등록 응답을 반환합니다.
+- 대기열에 등록된 신청은 `DELETE /api/enrollments/waitlist/{courseId}`로 취소할 수 있습니다.
 - 결제 확정은 `PENDING -> CONFIRMED` 상태 변경으로 처리합니다.
 - 수강 취소는 `PENDING -> CANCELLED` 상태 변경으로 처리합니다.
 - `CONFIRMED` 상태의 수강 신청은 취소할 수 없습니다.
