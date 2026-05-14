@@ -14,7 +14,7 @@ CREATE TABLE members
 
 CREATE TABLE courses
 (
-    id              BIGINT         NOT NULL AUTO_INCREMENT,
+    id              BIGINT         NOT NULL,
     creator_id      BIGINT         NOT NULL,
 
     title           VARCHAR(100)   NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE courses
 );
 
 CREATE TABLE enrollments (
-    id BIGINT NOT NULL AUTO_INCREMENT,
+    id BIGINT NOT NULL,
     course_id BIGINT NOT NULL,
     member_id BIGINT NOT NULL,
     status VARCHAR(20) NOT NULL,
