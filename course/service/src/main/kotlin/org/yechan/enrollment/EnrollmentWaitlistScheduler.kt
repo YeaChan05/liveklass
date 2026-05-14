@@ -1,5 +1,6 @@
 package org.yechan.enrollment
 
+import io.hypersistence.tsid.TSID
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.transaction.annotation.Transactional
 import org.yechan.course.CourseRepository
@@ -34,6 +35,7 @@ open class EnrollmentWaitlistScheduler(
                 val waitlist = waitlistRepository.pop(courseId) ?: return@mapNotNull null
 
                 EnrollmentModelData(
+                    enrollmentId = TSID.Factory.getTsid().toLong(),
                     courseId = courseId,
                     memberId = waitlist.memberId,
                     paymentPendingStartedAt = now,
