@@ -1,5 +1,6 @@
 package org.yechan.enrollment
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.SpringBootConfiguration
@@ -13,6 +14,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
+import org.springframework.test.web.servlet.client.expectBody
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.client.ApiVersionInserter
@@ -87,6 +89,25 @@ class EnrollmentControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `정원이 가득 찬 경우 대기열 등록 응답을 반환한다`() {
+        val accessToken =
+            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+
+        restTestClient.post()
+            .uri("/api/courses/999/enrollments")
+            .header("X-API-Version", "v1")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody<String>()
+            .value { body ->
+                assertThat(body).contains("\"enrollmentId\":null")
+                assertThat(body).contains("\"memberId\":2")
+                assertThat(body).contains("\"status\":\"WAITLISTED\"")
+            }
+    }
+
+    @Test
     fun `CREATOR도 수강 신청 API를 사용할 수 있다`() {
         val accessToken =
             tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
@@ -144,10 +165,19 @@ class EnrollmentControllerTest @Autowired constructor(
 }
 
 class FakeEnrollmentUseCase : EnrollmentUseCase {
-    override fun enroll(command: EnrollCourseCommand): EnrollmentResult = enrollment(
-        memberId = command.memberId,
-        status = EnrollmentStatus.PENDING,
-    )
+    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult = if (command.courseId == 999L) {
+        EnrollmentEnrollResult.Waitlisted(
+            courseId = command.courseId,
+            memberId = command.memberId,
+        )
+    } else {
+        EnrollmentEnrollResult.Enrolled(
+            enrollment(
+                memberId = command.memberId,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+    }
 
     override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
         memberId = command.memberId,
