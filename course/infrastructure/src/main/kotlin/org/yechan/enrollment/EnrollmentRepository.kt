@@ -30,6 +30,8 @@ interface EnrollmentWaitlistRepository {
 
     fun pop(courseId: Long): EnrollmentWaitlistEntry?
 
+    fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry>
+
     fun remove(
         courseId: Long,
         memberId: Long,
