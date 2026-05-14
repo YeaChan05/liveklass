@@ -1,10 +1,10 @@
 import http, { expectedStatuses } from 'k6/http';
-import { check, fail } from 'k6';
+import { check, fail, sleep } from 'k6';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 
-http.setResponseCallback(expectedStatuses(200, 201, 202, 400, 409));
+http.setResponseCallback(expectedStatuses(200, 201, 202, 204, 400, 409));
 
 const TOKEN_PATH = __ENV.TOKEN_PATH || '../tokens.json';
 
@@ -20,12 +20,22 @@ const SCENARIO_MAX_DURATION = __ENV.SCENARIO_MAX_DURATION || '2m';
 const GRACEFUL_STOP = __ENV.GRACEFUL_STOP || '30s';
 
 const COURSE_CAPACITY = Number(__ENV.COURSE_CAPACITY || 100);
-const CANCEL_COUNT = Number(__ENV.CANCEL_COUNT || 10);
-const REFILL_APPLICANT_COUNT = Number(__ENV.REFILL_APPLICANT_COUNT || 4900);
-const VUS = Number(__ENV.VUS || 100);
+const APPLICANT_COUNT = Number(__ENV.APPLICANT_COUNT || 5000);
+const INITIAL_CONFIRM_COUNT = Number(__ENV.INITIAL_CONFIRM_COUNT || 50);
+const EXPIRE_PENDING_COUNT = Number(__ENV.EXPIRE_PENDING_COUNT || 50);
+const REFILL_APPLICANT_COUNT = Number(__ENV.REFILL_APPLICANT_COUNT || EXPIRE_PENDING_COUNT);
+const VUS = Number(__ENV.VUS || 50);
 
-const refillSuccess = new Counter('refill_success');
-const refillFailed = new Counter('refill_failed');
+const WAIT_BEFORE_REFILL_SECONDS = Number(__ENV.WAIT_BEFORE_REFILL_SECONDS || 100);
+const REFILL_POLL_TIMEOUT_SECONDS = Number(__ENV.REFILL_POLL_TIMEOUT_SECONDS || 30);
+const REFILL_POLL_INTERVAL_SECONDS = Number(__ENV.REFILL_POLL_INTERVAL_SECONDS || 1);
+
+const initialPending = new Counter('initial_pending');
+const initialWaitlisted = new Counter('initial_waitlisted');
+const initialConfirmed = new Counter('initial_confirmed');
+const refillReady = new Counter('refill_ready');
+const refillConfirmed = new Counter('refill_confirmed');
+const scenarioFailed = new Counter('scenario_failed');
 
 const headers = {
   'Content-Type': 'application/json',
@@ -37,7 +47,7 @@ export const options = {
   teardownTimeout: TEARDOWN_TIMEOUT,
 
   scenarios: {
-    concurrent_refill_after_cancel: {
+    concurrent_confirm_after_payment_expiration: {
       executor: 'shared-iterations',
       vus: VUS,
       iterations: REFILL_APPLICANT_COUNT,
@@ -47,19 +57,24 @@ export const options = {
   },
 
   thresholds: {
-    refill_success: [`count==${REFILL_APPLICANT_COUNT}`],
-    refill_failed: ['count==0'],
+    http_req_failed: ['rate<0.01'],
     'http_req_duration{expected_response:true}': ['p(95)<20000'],
+    initial_pending: [`count==${COURSE_CAPACITY}`],
+    initial_waitlisted: [`count==${APPLICANT_COUNT - COURSE_CAPACITY}`],
+    initial_confirmed: [`count==${INITIAL_CONFIRM_COUNT}`],
+    refill_ready: [`count==${REFILL_APPLICANT_COUNT}`],
+    refill_confirmed: [`count==${REFILL_APPLICANT_COUNT}`],
+    scenario_failed: ['count==0'],
   },
 };
 
 export function setup() {
+  validateConfiguration();
+
   const testId = Date.now();
 
-  if (applicantTokens.length < COURSE_CAPACITY + REFILL_APPLICANT_COUNT) {
-    fail(
-        `tokens are not enough. tokenCount=${applicantTokens.length}, required=${COURSE_CAPACITY + REFILL_APPLICANT_COUNT}`,
-    );
+  if (applicantTokens.length < APPLICANT_COUNT) {
+    fail(`tokens are not enough. tokenCount=${applicantTokens.length}, applicantCount=${APPLICANT_COUNT}`);
   }
 
   assertApplicantTokenUsable(applicantTokens[0]);
@@ -76,12 +91,12 @@ export function setup() {
 
   const creatorToken = login(creatorEmail, creatorPassword);
 
-  const periodStart = new Date(Date.now() + 60 * 60 * 1000);
+  const periodStart = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const course = createCourse(creatorToken, {
-    title: `취소 후 재신청 테스트 강의-${testId}`,
-    description: 'k6 취소 후 재신청 동시성 테스트용 강의입니다.',
+    title: `결제 만료 후 대기자 확정 테스트 강의-${testId}`,
+    description: 'k6 결제 만료 후 대기자 승격 및 확정 테스트용 강의입니다.',
     price: 10000,
     capacity: COURSE_CAPACITY,
     periodStart: toLocalDateTimeString(periodStart),
@@ -96,45 +111,70 @@ export function setup() {
 
   openCourse(creatorToken, courseId);
 
-  const enrollmentIds = [];
+  const pendingEnrollmentIds = [];
 
   for (let i = 0; i < COURSE_CAPACITY; i += 1) {
     const res = enroll(applicantTokens[i], courseId);
+    const body = parseJsonOrFail(res, `initial pending enroll index=${i}`);
 
-    const success = res.status === 200 || res.status === 201;
-
-    if (!success) {
-      console.error(`prefill enroll failed. index=${i}`);
+    if (isPendingEnrollment(res, body)) {
+      initialPending.add(1);
+      pendingEnrollmentIds.push(extractEnrollmentIdAsString(res.body));
+    } else {
+      scenarioFailed.add(1);
+      console.error(`unexpected initial pending enroll response. index=${i}`);
       console.error(`status=${res.status}`);
       console.error(`body=${res.body}`);
-
-      fail('prefill enroll failed');
+      fail('unexpected initial pending enroll response');
     }
-
-    const enrollmentId = extractEnrollmentIdAsString(res.body);
-
-    if (!enrollmentId) {
-      console.error(`enrollmentId is missing. body=${res.body}`);
-      fail('enrollmentId is missing');
-    }
-
-    enrollmentIds.push(enrollmentId);
   }
 
-  for (let i = 0; i < CANCEL_COUNT; i += 1) {
-    const res = cancelEnrollment(applicantTokens[i], enrollmentIds[i]);
+  if (pendingEnrollmentIds.length !== COURSE_CAPACITY) {
+    scenarioFailed.add(1);
+    fail(`pending enrollment count mismatch. actual=${pendingEnrollmentIds.length}, expected=${COURSE_CAPACITY}`);
+  }
 
-    const success = res.status === 200 || res.status === 204;
+  for (let i = 0; i < INITIAL_CONFIRM_COUNT; i += 1) {
+    const res = confirmEnrollment(applicantTokens[i], pendingEnrollmentIds[i]);
+    const body = parseJsonOrFail(res, `initial confirm index=${i}`);
+    const success = isConfirmedEnrollment(res, body);
+
+    check(res, {
+      '초기 50명 결제 확정 성공': () => success,
+    });
 
     if (!success) {
-      console.error(`cancel failed. index=${i}`);
-      console.error(`enrollmentId=${enrollmentIds[i]}`);
+      scenarioFailed.add(1);
+      console.error(`initial confirm failed. index=${i}`);
+      console.error(`enrollmentId=${pendingEnrollmentIds[i]}`);
       console.error(`status=${res.status}`);
       console.error(`body=${res.body}`);
+      fail('initial confirm failed');
+    }
 
-      fail('cancel failed');
+    initialConfirmed.add(1);
+  }
+
+  for (let i = COURSE_CAPACITY; i < APPLICANT_COUNT; i += 1) {
+    const res = enroll(applicantTokens[i], courseId);
+    const body = parseJsonOrFail(res, `initial waitlist enroll index=${i}`);
+
+    if (isWaitlisted(res, body)) {
+      initialWaitlisted.add(1);
+    } else {
+      scenarioFailed.add(1);
+      console.error(`unexpected initial waitlist enroll response. index=${i}`);
+      console.error(`status=${res.status}`);
+      console.error(`body=${res.body}`);
+      fail('unexpected initial waitlist enroll response');
     }
   }
+
+  console.log(
+      `waiting before refill. seconds=${WAIT_BEFORE_REFILL_SECONDS}, ` +
+      `unconfirmedPending=${EXPIRE_PENDING_COUNT}, refillApplicants=${REFILL_APPLICANT_COUNT}`,
+  );
+  sleep(WAIT_BEFORE_REFILL_SECONDS);
 
   return {
     courseId,
@@ -148,27 +188,29 @@ export default function (data) {
   const token = applicantTokens[tokenIndex];
 
   if (!token) {
-    refillFailed.add(1);
-    fail(`applicant token is missing. tokenIndex=${tokenIndex}`);
+    scenarioFailed.add(1);
+    fail(`refill applicant token is missing. tokenIndex=${tokenIndex}`);
   }
 
-  const res = enroll(token, data.courseId);
+  const enrollment = waitForRefillPendingEnrollment(token, data.courseId, index);
+  refillReady.add(1);
 
-  const success = res.status === 200 || res.status === 201;
+  const confirmRes = confirmEnrollment(token, enrollment.enrollmentId);
+  const confirmBody = parseJsonOrFail(confirmRes, `refill confirm index=${index}`);
+  const confirmed = isConfirmedEnrollment(confirmRes, confirmBody);
 
-  if (success) {
-    refillSuccess.add(1);
+  if (confirmed) {
+    refillConfirmed.add(1);
   } else {
-    refillFailed.add(1);
+    scenarioFailed.add(1);
+    console.error(`refill confirm failed. index=${index}`);
+    console.error(`enrollmentId=${enrollment.enrollmentId}`);
+    console.error(`status=${confirmRes.status}`);
+    console.error(`body=${confirmRes.body}`);
   }
 
-  check(res, {
-    '취소된 좌석 재신청 성공 또는 정원 초과 처리': (r) =>
-        r.status === 200 ||
-        r.status === 201 ||
-        r.status === 202 ||
-        r.status === 400 ||
-        r.status === 409,
+  check(confirmRes, {
+    '대기자 승격 후 결제 확정 성공': () => confirmed,
   });
 }
 
@@ -200,9 +242,53 @@ export function teardown(data) {
 
   check(body, {
     '남은 좌석은 0': (course) => course.seatLeftCount === 0,
-    '현재 신청 인원은 capacity와 같다': (course) =>
-        course.currentEnrollmentCount === COURSE_CAPACITY,
+    '현재 신청 인원은 capacity와 같다': (course) => course.currentEnrollmentCount === COURSE_CAPACITY,
   });
+}
+
+function waitForRefillPendingEnrollment(token, courseId, index) {
+  const startedAt = Date.now();
+  let lastEnrollBody = '';
+
+  while ((Date.now() - startedAt) / 1000 <= REFILL_POLL_TIMEOUT_SECONDS) {
+    const res = enroll(token, courseId);
+    lastEnrollBody = res.body;
+
+    const body = parseJsonOrFail(res, `refill enroll index=${index}`);
+
+    if (isPendingEnrollment(res, body)) {
+      const enrollmentId = extractEnrollmentIdAsString(res.body);
+      if (!enrollmentId) {
+        scenarioFailed.add(1);
+        console.error(`refill enrollmentId is missing. index=${index}`);
+        console.error(`body=${res.body}`);
+        fail('refill enrollmentId is missing');
+      }
+
+      return {
+        enrollmentId,
+        rawBody: res.body,
+      };
+    }
+
+    if (!isWaitlisted(res, body)) {
+      scenarioFailed.add(1);
+      console.error(`unexpected refill enroll response. index=${index}`);
+      console.error(`courseId=${courseId}`);
+      console.error(`status=${res.status}`);
+      console.error(`body=${res.body}`);
+      fail('unexpected refill enroll response');
+    }
+
+    sleep(REFILL_POLL_INTERVAL_SECONDS);
+  }
+
+  scenarioFailed.add(1);
+  console.error(`refill pending enrollment is missing. index=${index}`);
+  console.error(`courseId=${courseId}`);
+  console.error(`lastEnrollBody=${lastEnrollBody}`);
+
+  fail('refill pending enrollment is missing');
 }
 
 function signup(body) {
@@ -253,7 +339,6 @@ function login(email, password) {
   }
 
   const body = parseJsonOrFail(res, 'login');
-
   const token = body.accessToken || body.token || body.access_token;
 
   if (!token) {
@@ -364,9 +449,9 @@ function enroll(token, courseId) {
   );
 }
 
-function cancelEnrollment(token, enrollmentId) {
+function confirmEnrollment(token, enrollmentId) {
   return http.post(
-      `${BASE_URL}/api/enrollments/${enrollmentId}/cancel`,
+      `${BASE_URL}/api/enrollments/${enrollmentId}/confirm`,
       null,
       {
         headers: {
@@ -374,7 +459,7 @@ function cancelEnrollment(token, enrollmentId) {
           Authorization: `Bearer ${token}`,
         },
         tags: {
-          name: 'POST /api/enrollments/{enrollmentId}/cancel',
+          name: 'POST /api/enrollments/{enrollmentId}/confirm',
         },
       },
   );
@@ -447,6 +532,42 @@ function parseJsonOrFail(res, context) {
     console.error(`body=${res.body}`);
 
     fail(`${context} response json parse failed`);
+  }
+}
+
+function isPendingEnrollment(res, body) {
+  return (res.status === 200 || res.status === 201) && body && body.enrollmentId != null && body.status === 'PENDING';
+}
+
+function isWaitlisted(res, body) {
+  return (res.status === 200 || res.status === 201 || res.status === 202) && body && body.status === 'WAITLISTED';
+}
+
+function isConfirmedEnrollment(res, body) {
+  return (res.status === 200 || res.status === 201) && body && body.enrollmentId != null && body.status === 'CONFIRMED';
+}
+
+function validateConfiguration() {
+  if (COURSE_CAPACITY <= 0) {
+    fail(`COURSE_CAPACITY must be positive. COURSE_CAPACITY=${COURSE_CAPACITY}`);
+  }
+
+  if (APPLICANT_COUNT <= COURSE_CAPACITY) {
+    fail(`APPLICANT_COUNT must be greater than COURSE_CAPACITY. applicantCount=${APPLICANT_COUNT}, courseCapacity=${COURSE_CAPACITY}`);
+  }
+
+  if (INITIAL_CONFIRM_COUNT + EXPIRE_PENDING_COUNT !== COURSE_CAPACITY) {
+    fail(
+        `INITIAL_CONFIRM_COUNT + EXPIRE_PENDING_COUNT must equal COURSE_CAPACITY. ` +
+        `initialConfirm=${INITIAL_CONFIRM_COUNT}, expirePending=${EXPIRE_PENDING_COUNT}, courseCapacity=${COURSE_CAPACITY}`,
+    );
+  }
+
+  if (REFILL_APPLICANT_COUNT > APPLICANT_COUNT - COURSE_CAPACITY) {
+    fail(
+        `REFILL_APPLICANT_COUNT must be less than or equal to waitlisted count. ` +
+        `refillApplicantCount=${REFILL_APPLICANT_COUNT}, waitlistedCount=${APPLICANT_COUNT - COURSE_CAPACITY}`,
+    );
   }
 }
 

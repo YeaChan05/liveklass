@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "enrollment.payment-pending.expires-in",
+      "type": "java.lang.String",
+      "description": "Description for enrollment.payment-pending.expires-in."
+  }
+] }
