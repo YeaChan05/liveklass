@@ -1,27 +1,40 @@
 package org.yechan.enrollment
 
 import org.springframework.transaction.annotation.Transactional
-import org.yechan.course.CourseInvalidStateException
 import java.time.Instant
+
+sealed interface EnrollmentEnrollResult {
+    data class Enrolled(
+        val enrollment: EnrollmentResult,
+    ) : EnrollmentEnrollResult
+
+    data class Waitlisted(
+        val courseId: Long,
+        val memberId: Long,
+    ) : EnrollmentEnrollResult
+}
 
 open class EnrollmentService(
     private val enrollmentTransactionService: EnrollmentTransactionService,
     private val enrollmentRepository: EnrollmentRepository,
     private val waitlistRepository: EnrollmentWaitlistRepository,
 ) : EnrollmentUseCase {
-    override fun enroll(command: EnrollCourseCommand): EnrollmentResult {
+    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult {
         val memberId = command.memberId
         val courseId = command.courseId
 
         if (waitlistRepository.isSoldOut(courseId)) {
             enqueueWaitlist(courseId, memberId)
-            throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
+            return EnrollmentEnrollResult.Waitlisted(
+                courseId = courseId,
+                memberId = memberId,
+            )
         }
 
         return when (val result = enrollmentTransactionService.enroll(command)) {
-            is EnrollmentEnrollResult.Enrolled -> result.enrollment
+            is EnrollmentEnrollTransactionResult.Enrolled -> EnrollmentEnrollResult.Enrolled(result.enrollment)
 
-            EnrollmentEnrollResult.SoldOut -> {
+            EnrollmentEnrollTransactionResult.SoldOut -> {
                 rejectSoldOut(courseId, memberId)
             }
         }
@@ -52,7 +65,7 @@ open class EnrollmentService(
     private fun rejectSoldOut(
         courseId: Long,
         memberId: Long,
-    ): Nothing {
+    ): EnrollmentEnrollResult.Waitlisted {
         waitlistRepository.markSoldOut(courseId)
         try {
             enrollmentTransactionService.requireOpenCourse(courseId)
@@ -62,6 +75,15 @@ open class EnrollmentService(
         }
 
         enqueueWaitlist(courseId, memberId)
-        throw CourseInvalidStateException("강의 정원을 초과할 수 없습니다.")
+        return EnrollmentEnrollResult.Waitlisted(
+            courseId = courseId,
+            memberId = memberId,
+        )
     }
 }
+
+val EnrollmentEnrollResult.enrollment: EnrollmentResult
+    get() = when (this) {
+        is EnrollmentEnrollResult.Enrolled -> enrollment
+        is EnrollmentEnrollResult.Waitlisted -> error("대기열 등록 결과에는 수강 신청 정보가 없습니다.")
+    }

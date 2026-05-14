@@ -8,7 +8,7 @@ import org.yechan.course.CourseStatus
 import org.yechan.course.EnrollmentNotFoundException
 
 interface EnrollmentUseCase {
-    fun enroll(command: EnrollCourseCommand): EnrollmentResult
+    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult
 
     fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
 
@@ -17,12 +17,12 @@ interface EnrollmentUseCase {
     fun getMyEnrollments(memberId: Long): List<EnrollmentResult>
 }
 
-sealed interface EnrollmentEnrollResult {
+sealed interface EnrollmentEnrollTransactionResult {
     data class Enrolled(
         val enrollment: EnrollmentResult,
-    ) : EnrollmentEnrollResult
+    ) : EnrollmentEnrollTransactionResult
 
-    data object SoldOut : EnrollmentEnrollResult
+    data object SoldOut : EnrollmentEnrollTransactionResult
 }
 
 data class EnrollmentCancelResult(
@@ -36,12 +36,12 @@ class EnrollmentTransactionService(
     private val enrollmentRepository: EnrollmentRepository,
 ) {
     @Transactional
-    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult {
+    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
         val memberId = command.memberId
         val courseId = command.courseId
 
         if (!courseRepository.reserveSeatIfAvailable(courseId)) {
-            return EnrollmentEnrollResult.SoldOut
+            return EnrollmentEnrollTransactionResult.SoldOut
         }
 
         val enrollment = EnrollmentModelData(
@@ -51,7 +51,7 @@ class EnrollmentTransactionService(
             status = EnrollmentStatus.PENDING,
         )
 
-        return EnrollmentEnrollResult.Enrolled(enrollmentRepository.save(enrollment).toResult())
+        return EnrollmentEnrollTransactionResult.Enrolled(enrollmentRepository.save(enrollment).toResult())
     }
 
     @Transactional(readOnly = true)
