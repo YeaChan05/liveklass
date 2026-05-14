@@ -54,7 +54,6 @@ class EnrollmentTransactionService(
         return EnrollmentEnrollTransactionResult.Enrolled(enrollmentRepository.save(enrollment).toResult())
     }
 
-    @Transactional(readOnly = true)
     fun requireOpenCourse(courseId: Long) {
         val course = courseRepository.findById(courseId)
             ?: throw CourseNotFoundException()
