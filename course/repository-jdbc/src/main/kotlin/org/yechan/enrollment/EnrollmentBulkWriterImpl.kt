@@ -9,15 +9,29 @@ class EnrollmentBulkWriterImpl(
     private val jdbcTemplate: JdbcTemplate,
 ) : EnrollmentBulkWriter {
     override fun saveAllBulk(enrollments: List<EnrollmentModelData>) {
-        enrollments.forEach { enrollment ->
-            jdbcTemplate.update(
-                """
-                INSERT INTO enrollments (enrollments.id, enrollments.member_id)
-                VALUES (?, ?)
-                """.trimIndent(),
-                enrollment.courseId,
-                enrollment.memberId,
-            )
+        if (enrollments.isEmpty()) return
+
+        jdbcTemplate.batchUpdate(
+            """
+        INSERT INTO enrollments (
+            id,
+            course_id,
+            member_id,
+            status,
+            payment_pending_started_at,
+            payment_pending_expires_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            enrollments,
+            enrollments.size,
+        ) { ps, enrollment ->
+            ps.setLong(1, enrollment.enrollmentId!!)
+            ps.setLong(2, enrollment.courseId)
+            ps.setLong(3, enrollment.memberId)
+            ps.setString(4, enrollment.status.name)
+            ps.setObject(5, enrollment.paymentPendingStartedAt)
+            ps.setObject(6, enrollment.paymentPendingExpiresAt)
         }
     }
 
