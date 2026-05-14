@@ -1,7 +1,6 @@
 package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,27 +16,17 @@ class EnrollmentBulkWriterImplTest @Autowired constructor(
 ) {
     private val enrollmentBulkWriter = EnrollmentBulkWriterImpl(jdbcTemplate)
 
-    @BeforeEach
-    fun setUp() {
-        jdbcTemplate.execute(
-            """
-            CREATE TABLE IF NOT EXISTS enrollments (
-                id BIGINT NOT NULL,
-                member_id BIGINT NOT NULL
-            )
-            """.trimIndent(),
-        )
-    }
-
     @Test
     @DisplayName("수강 신청 목록을 저장할 수 있다")
     fun saveAllBulk() {
         val enrollments = listOf(
             EnrollmentModelData(
+                enrollmentId = 1L,
                 courseId = 1L,
                 memberId = 10L,
             ),
             EnrollmentModelData(
+                enrollmentId = 2L,
                 courseId = 2L,
                 memberId = 20L,
             ),

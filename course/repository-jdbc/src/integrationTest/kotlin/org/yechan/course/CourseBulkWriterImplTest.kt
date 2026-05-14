@@ -25,23 +25,6 @@ class CourseBulkWriterImplTest @Autowired constructor(
 ) {
     @BeforeEach
     fun setUp() {
-        jdbcTemplate.execute(
-            """
-            CREATE TABLE IF NOT EXISTS courses (
-                id BIGINT NOT NULL PRIMARY KEY,
-                creator_id BIGINT NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                description VARCHAR(255) NOT NULL,
-                price DECIMAL(19, 2) NOT NULL,
-                capacity INT NOT NULL,
-                seat_left_count INT NOT NULL,
-                period_start DATETIME(6) NOT NULL,
-                period_end DATETIME(6) NOT NULL,
-                status VARCHAR(20) NOT NULL
-            )
-            """.trimIndent(),
-        )
-
         jdbcTemplate.update("DELETE FROM courses")
     }
 
