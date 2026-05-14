@@ -77,6 +77,7 @@ export function setup() {
     fail(`tokens are not enough. tokenCount=${applicantTokens.length}, applicantCount=${APPLICANT_COUNT}`);
   }
 
+  assertApplicantTokensValidLongEnough();
   assertApplicantTokenUsable(applicantTokens[0]);
 
   const creatorEmail = `creator-${testId}@test.com`;
@@ -166,6 +167,12 @@ export function setup() {
       console.error(`unexpected initial waitlist enroll response. index=${i}`);
       console.error(`status=${res.status}`);
       console.error(`body=${res.body}`);
+      if (isPendingEnrollment(res, body)) {
+        console.error(
+            'initial waitlist setup overlapped with payment expiration. ' +
+            'Restart the application with ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN=60s or longer.',
+        );
+      }
       fail('unexpected initial waitlist enroll response');
     }
   }
@@ -246,11 +253,20 @@ export function teardown(data) {
   });
 }
 
+
 function waitForRefillPendingEnrollment(token, courseId, index) {
   const startedAt = Date.now();
   let lastEnrollBody = '';
+  let lastEnrollmentBody = '';
 
   while ((Date.now() - startedAt) / 1000 <= REFILL_POLL_TIMEOUT_SECONDS) {
+    const promoted = findMyPendingEnrollment(token, courseId);
+    lastEnrollmentBody = promoted.rawBody;
+
+    if (promoted.enrollmentId) {
+      return promoted;
+    }
+
     const res = enroll(token, courseId);
     lastEnrollBody = res.body;
 
@@ -272,12 +288,21 @@ function waitForRefillPendingEnrollment(token, courseId, index) {
     }
 
     if (!isWaitlisted(res, body)) {
-      scenarioFailed.add(1);
-      console.error(`unexpected refill enroll response. index=${index}`);
-      console.error(`courseId=${courseId}`);
-      console.error(`status=${res.status}`);
-      console.error(`body=${res.body}`);
-      fail('unexpected refill enroll response');
+      const promotedAfterRace = findMyPendingEnrollment(token, courseId);
+      lastEnrollmentBody = promotedAfterRace.rawBody;
+
+      if (promotedAfterRace.enrollmentId) {
+        return promotedAfterRace;
+      }
+
+      if (!isRetryableRefillResponse(res)) {
+        scenarioFailed.add(1);
+        console.error(`unexpected refill enroll response. index=${index}`);
+        console.error(`courseId=${courseId}`);
+        console.error(`status=${res.status}`);
+        console.error(`body=${res.body}`);
+        fail('unexpected refill enroll response');
+      }
     }
 
     sleep(REFILL_POLL_INTERVAL_SECONDS);
@@ -286,9 +311,53 @@ function waitForRefillPendingEnrollment(token, courseId, index) {
   scenarioFailed.add(1);
   console.error(`refill pending enrollment is missing. index=${index}`);
   console.error(`courseId=${courseId}`);
+  console.error(`lastEnrollmentBody=${lastEnrollmentBody}`);
   console.error(`lastEnrollBody=${lastEnrollBody}`);
 
   fail('refill pending enrollment is missing');
+}
+
+function findMyPendingEnrollment(token, courseId) {
+  const res = http.get(`${BASE_URL}/api/enrollments/me`, {
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    },
+    tags: {
+      name: 'GET /api/enrollments/me',
+    },
+  });
+
+  if (res.status !== 200) {
+    return {
+      enrollmentId: null,
+      rawBody: res.body,
+    };
+  }
+
+  return {
+    enrollmentId: extractPendingEnrollmentIdForCourse(res.body, courseId),
+    rawBody: res.body,
+  };
+}
+
+function extractPendingEnrollmentIdForCourse(body, courseId) {
+  const objects = body.match(/\{[^{}]*\}/g) || [];
+
+  for (const object of objects) {
+    const objectCourseId = extractCourseIdAsString(object);
+    const enrollmentId = extractEnrollmentIdAsString(object);
+
+    if (objectCourseId === String(courseId) && enrollmentId && /"status"\s*:\s*"PENDING"/.test(object)) {
+      return enrollmentId;
+    }
+  }
+
+  return null;
+}
+
+function isRetryableRefillResponse(res) {
+  return res.status === 401 || res.status === 409 || res.status >= 500;
 }
 
 function signup(body) {
@@ -516,6 +585,94 @@ function assertApplicantTokenUsable(token) {
         'Regenerate k6/tokens.json from the same application/database before running this scenario.',
     );
   }
+}
+
+function assertApplicantTokensValidLongEnough() {
+  const requiredTtlSeconds = WAIT_BEFORE_REFILL_SECONDS + REFILL_POLL_TIMEOUT_SECONDS + 120;
+  const tokenIndexes = [
+    0,
+    COURSE_CAPACITY - 1,
+    COURSE_CAPACITY,
+    COURSE_CAPACITY + REFILL_APPLICANT_COUNT - 1,
+  ];
+
+  tokenIndexes.forEach((tokenIndex) => {
+    const token = applicantTokens[tokenIndex];
+
+    if (!token) {
+      fail(`applicant token is missing. tokenIndex=${tokenIndex}`);
+    }
+
+    const exp = extractJwtExp(token);
+
+    if (!exp) {
+      fail(`applicant token exp claim is missing. tokenIndex=${tokenIndex}`);
+    }
+
+    const remainingTtlSeconds = exp - Math.floor(Date.now() / 1000);
+
+    if (remainingTtlSeconds <= requiredTtlSeconds) {
+      fail(
+          `applicant token expires before refill can finish. ` +
+          `tokenIndex=${tokenIndex}, remainingTtlSeconds=${remainingTtlSeconds}, ` +
+          `requiredTtlSeconds=${requiredTtlSeconds}. ` +
+          `Restart the application with MEMBER_TOKEN_GENERATOR_ENABLED=true to regenerate k6/tokens.json before running this scenario.`,
+      );
+    }
+  });
+}
+
+function extractJwtExp(token) {
+  const parts = token.split('.');
+
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const payload = decodeBase64Url(parts[1]);
+
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const body = JSON.parse(payload);
+    return Number(body.exp || 0);
+  } catch (e) {
+    return null;
+  }
+}
+
+function decodeBase64Url(value) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  let buffer = 0;
+  let bits = 0;
+  let output = '';
+
+  for (let i = 0; i < normalized.length; i += 1) {
+    const char = normalized[i];
+
+    if (char === '=') {
+      break;
+    }
+
+    const index = alphabet.indexOf(char);
+
+    if (index < 0) {
+      return null;
+    }
+
+    buffer = (buffer << 6) | index;
+    bits += 6;
+
+    if (bits >= 8) {
+      bits -= 8;
+      output += String.fromCharCode((buffer >> bits) & 0xff);
+    }
+  }
+
+  return output;
 }
 
 function parseJsonOrFail(res, context) {
