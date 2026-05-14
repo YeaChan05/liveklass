@@ -4,7 +4,6 @@ import org.springframework.transaction.annotation.Transactional
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
-import org.yechan.course.CourseStatus
 import org.yechan.course.EnrollmentNotFoundException
 
 interface EnrollmentUseCase {
@@ -51,16 +50,15 @@ class EnrollmentTransactionService(
             status = EnrollmentStatus.PENDING,
         )
 
-        return EnrollmentEnrollTransactionResult.Enrolled(enrollmentRepository.save(enrollment).toResult())
+        return EnrollmentEnrollTransactionResult.Enrolled(
+            enrollmentRepository.save(enrollment).toResult(),
+        )
     }
 
     fun requireOpenCourse(courseId: Long) {
         val course = courseRepository.findById(courseId)
             ?: throw CourseNotFoundException()
-
-        if (course.status != CourseStatus.OPEN) {
-            throw CourseInvalidStateException("모집 중인 강의만 신청할 수 있습니다.")
-        }
+        course.validateIsOpen()
     }
 
     @Transactional

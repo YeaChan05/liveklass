@@ -219,7 +219,7 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+            .hasMessage("모집중인 강의가 아닙니다.")
     }
 
     @Test
@@ -234,7 +234,7 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+            .hasMessage("모집중인 강의가 아닙니다.")
     }
 
     @Test
