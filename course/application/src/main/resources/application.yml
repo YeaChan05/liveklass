@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/course?useSSL=false&serverTimezone=UTC&useInformationSchema=true
+    url: jdbc:mysql://localhost:3306/course?useSSL=false&serverTimezone=UTC&useInformationSchema=true&rewriteBatchedStatements=true
     username: root
     password: password
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -55,6 +55,8 @@ load-test:
     enabled: ${MEMBER_TOKEN_GENERATOR_ENABLED:false}
     count: ${MEMBER_TOKEN_GENERATOR_COUNT:5000}
     output-path: ${MEMBER_TOKEN_GENERATOR_OUTPUT_PATH:./k6/tokens.json}
+    batch-size: ${MEMBER_TOKEN_GENERATOR_BATCH_SIZE:5000}
+    run-id: ${MEMBER_TOKEN_GENERATOR_RUN_ID:${random.uuid}}
     email-prefix: k6-classmate
     email-domain: test.com
     password-hash: NOT_USED_BY_K6
