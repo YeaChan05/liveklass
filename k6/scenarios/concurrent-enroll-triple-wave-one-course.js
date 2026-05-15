@@ -28,23 +28,24 @@ const SECOND_WAVE_APPLICANT_COUNT = Number(__ENV.SECOND_WAVE_APPLICANT_COUNT || 
 const THIRD_WAVE_APPLICANT_COUNT = Number(__ENV.THIRD_WAVE_APPLICANT_COUNT || 100);
 const VUS = Number(__ENV.VUS || 150);
 
-const WAIT_BEFORE_FIRST_REFILL_SECONDS = Number(__ENV.WAIT_BEFORE_FIRST_REFILL_SECONDS || 20);
+const WAIT_BEFORE_FIRST_REFILL_SECONDS = Number(__ENV.WAIT_BEFORE_FIRST_REFILL_SECONDS || 70);
 const WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS = Number(__ENV.WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS || 140);
 const WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS = Number(__ENV.WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS || 140);
-const FIRST_WAVE_POLL_TIMEOUT_SECONDS = Number(__ENV.FIRST_WAVE_POLL_TIMEOUT_SECONDS || 30);
-const SECOND_WAVE_POLL_TIMEOUT_SECONDS = Number(__ENV.SECOND_WAVE_POLL_TIMEOUT_SECONDS || 30);
-const THIRD_WAVE_POLL_TIMEOUT_SECONDS = Number(__ENV.THIRD_WAVE_POLL_TIMEOUT_SECONDS || 30);
-const REFILL_POLL_INTERVAL_SECONDS = Number(__ENV.REFILL_POLL_INTERVAL_SECONDS || 1);
+
+const EXPECTED_FINAL_SEAT_LEFT_COUNT = EXPIRE_PENDING_COUNT;
+const EXPECTED_FINAL_CURRENT_ENROLLMENT_COUNT = INITIAL_CONFIRM_COUNT;
 
 const initialPending = new Counter('initial_pending');
 const initialWaitlisted = new Counter('initial_waitlisted');
 const initialConfirmed = new Counter('initial_confirmed');
-const firstWaveReady = new Counter('first_wave_ready');
-const firstWaveExpired = new Counter('first_wave_expired');
-const secondWaveReady = new Counter('second_wave_ready');
-const secondWaveExpired = new Counter('second_wave_expired');
-const thirdWaveReady = new Counter('third_wave_ready');
-const thirdWaveConfirmed = new Counter('third_wave_confirmed');
+
+const firstWaveWaitlisted = new Counter('first_wave_waitlisted');
+const secondWaveWaitlisted = new Counter('second_wave_waitlisted');
+const thirdWaveWaitlisted = new Counter('third_wave_waitlisted');
+
+const finalSeatLeftMatched = new Counter('final_seat_left_matched');
+const finalCurrentEnrollmentCountMatched = new Counter('final_current_enrollment_count_matched');
+
 const scenarioFailed = new Counter('scenario_failed');
 
 const headers = {
@@ -57,10 +58,32 @@ export const options = {
   teardownTimeout: TEARDOWN_TIMEOUT,
 
   scenarios: {
-    concurrent_triple_wave_refill_to_one_course: {
+    first_wave: {
       executor: 'shared-iterations',
-      vus: VUS,
-      iterations: FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + THIRD_WAVE_APPLICANT_COUNT,
+      vus: Math.min(VUS, FIRST_WAVE_APPLICANT_COUNT),
+      iterations: FIRST_WAVE_APPLICANT_COUNT,
+      startTime: '0s',
+      exec: 'firstWave',
+      maxDuration: SCENARIO_MAX_DURATION,
+      gracefulStop: GRACEFUL_STOP,
+    },
+
+    second_wave: {
+      executor: 'shared-iterations',
+      vus: Math.min(VUS, SECOND_WAVE_APPLICANT_COUNT),
+      iterations: SECOND_WAVE_APPLICANT_COUNT,
+      startTime: `${WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS}s`,
+      exec: 'secondWave',
+      maxDuration: SCENARIO_MAX_DURATION,
+      gracefulStop: GRACEFUL_STOP,
+    },
+
+    third_wave: {
+      executor: 'shared-iterations',
+      vus: Math.min(VUS, THIRD_WAVE_APPLICANT_COUNT),
+      iterations: THIRD_WAVE_APPLICANT_COUNT,
+      startTime: `${WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS + WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS}s`,
+      exec: 'thirdWave',
       maxDuration: SCENARIO_MAX_DURATION,
       gracefulStop: GRACEFUL_STOP,
     },
@@ -69,15 +92,18 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.01'],
     'http_req_duration{expected_response:true}': ['p(95)<20000'],
+
     initial_pending: [`count==${COURSE_CAPACITY}`],
     initial_waitlisted: [`count==${APPLICANT_COUNT - COURSE_CAPACITY}`],
     initial_confirmed: [`count==${INITIAL_CONFIRM_COUNT}`],
-    first_wave_ready: [`count==${FIRST_WAVE_APPLICANT_COUNT}`],
-    first_wave_expired: [`count==${FIRST_WAVE_APPLICANT_COUNT}`],
-    second_wave_ready: [`count==${SECOND_WAVE_APPLICANT_COUNT}`],
-    second_wave_expired: [`count==${SECOND_WAVE_APPLICANT_COUNT}`],
-    third_wave_ready: [`count==${THIRD_WAVE_APPLICANT_COUNT}`],
-    third_wave_confirmed: [`count==${THIRD_WAVE_APPLICANT_COUNT}`],
+
+    first_wave_waitlisted: [`count==${FIRST_WAVE_APPLICANT_COUNT}`],
+    second_wave_waitlisted: [`count==${SECOND_WAVE_APPLICANT_COUNT}`],
+    third_wave_waitlisted: [`count==${THIRD_WAVE_APPLICANT_COUNT}`],
+
+    final_seat_left_matched: ['count==1'],
+    final_current_enrollment_count_matched: ['count==1'],
+
     scenario_failed: ['count==0'],
   },
 };
@@ -110,8 +136,8 @@ export function setup() {
   const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const course = createCourse(creatorToken, {
-    title: `결제 만료 후 대기자 확정 테스트 강의-${testId}`,
-    description: 'k6 결제 만료 후 대기자 승격 및 확정 테스트용 강의입니다.',
+    title: `결제 만료 후 좌석 반환 테스트 강의-${testId}`,
+    description: 'k6 결제 만료 후 좌석 반환 및 대기열 유지 검증용 강의입니다.',
     price: 10000,
     capacity: COURSE_CAPACITY,
     periodStart: toLocalDateTimeString(periodStart),
@@ -155,7 +181,7 @@ export function setup() {
     const success = isConfirmedEnrollment(res, body);
 
     check(res, {
-      '초기 50명 결제 확정 성공': () => success,
+      '초기 결제 확정 성공': () => success,
     });
 
     if (!success) {
@@ -181,21 +207,26 @@ export function setup() {
       console.error(`unexpected initial waitlist enroll response. index=${i}`);
       console.error(`status=${res.status}`);
       console.error(`body=${res.body}`);
+
       if (isPendingEnrollment(res, body)) {
         console.error(
             'initial waitlist setup overlapped with payment expiration. ' +
-            'Restart the application with ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN=60s or longer.',
+            'Restart the application with a longer ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN.',
         );
       }
+
       fail('unexpected initial waitlist enroll response');
     }
   }
 
   console.log(
       `waiting before first wave. seconds=${WAIT_BEFORE_FIRST_REFILL_SECONDS}, ` +
-      `unconfirmedPending=${EXPIRE_PENDING_COUNT}, firstWaveApplicants=${FIRST_WAVE_APPLICANT_COUNT}, ` +
-      `secondWaveApplicants=${SECOND_WAVE_APPLICANT_COUNT}, thirdWaveApplicants=${THIRD_WAVE_APPLICANT_COUNT}`,
+      `expiredPendingTarget=${EXPIRE_PENDING_COUNT}, ` +
+      `firstWaveApplicants=${FIRST_WAVE_APPLICANT_COUNT}, ` +
+      `secondWaveApplicants=${SECOND_WAVE_APPLICANT_COUNT}, ` +
+      `thirdWaveApplicants=${THIRD_WAVE_APPLICANT_COUNT}`,
   );
+
   sleep(WAIT_BEFORE_FIRST_REFILL_SECONDS);
 
   return {
@@ -204,19 +235,40 @@ export function setup() {
   };
 }
 
-export default function (data) {
+export function firstWave(data) {
   const index = exec.scenario.iterationInTest;
-  if (index < FIRST_WAVE_APPLICANT_COUNT) {
-    handleFirstWave(data.courseId, index);
-    return;
-  }
 
-  if (index < FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT) {
-    handleSecondWave(data.courseId, index - FIRST_WAVE_APPLICANT_COUNT);
-    return;
-  }
+  verifyWaitlistMaintained({
+    courseId: data.courseId,
+    waveName: 'first',
+    waveIndex: index,
+    tokenIndex: COURSE_CAPACITY + index,
+    counter: firstWaveWaitlisted,
+  });
+}
 
-  handleThirdWave(data.courseId, index - FIRST_WAVE_APPLICANT_COUNT - SECOND_WAVE_APPLICANT_COUNT);
+export function secondWave(data) {
+  const index = exec.scenario.iterationInTest;
+
+  verifyWaitlistMaintained({
+    courseId: data.courseId,
+    waveName: 'second',
+    waveIndex: index,
+    tokenIndex: COURSE_CAPACITY + FIRST_WAVE_APPLICANT_COUNT + index,
+    counter: secondWaveWaitlisted,
+  });
+}
+
+export function thirdWave(data) {
+  const index = exec.scenario.iterationInTest;
+
+  verifyWaitlistMaintained({
+    courseId: data.courseId,
+    waveName: 'third',
+    waveIndex: index,
+    tokenIndex: COURSE_CAPACITY + FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + index,
+    counter: thirdWaveWaitlisted,
+  });
 }
 
 export function teardown(data) {
@@ -237,6 +289,7 @@ export function teardown(data) {
   });
 
   if (!success) {
+    scenarioFailed.add(1);
     console.error('get course failed in teardown');
     console.error(`status=${res.status}`);
     console.error(`body=${res.body}`);
@@ -245,165 +298,96 @@ export function teardown(data) {
 
   const body = parseJsonOrFail(res, 'get course in teardown');
 
+  const seatLeftMatched = body.seatLeftCount === EXPECTED_FINAL_SEAT_LEFT_COUNT;
+  const currentEnrollmentCountMatched =
+      body.currentEnrollmentCount === EXPECTED_FINAL_CURRENT_ENROLLMENT_COUNT;
+
   check(body, {
-    '남은 좌석은 0': (course) => course.seatLeftCount === 0,
-    '현재 신청 인원은 capacity와 같다': (course) => course.currentEnrollmentCount === COURSE_CAPACITY,
+    '남은 좌석은 만료된 결제 대기 수와 같다': () => seatLeftMatched,
+    '현재 신청 인원은 초기 확정 수와 같다': () => currentEnrollmentCountMatched,
   });
-}
 
-function handleFirstWave(courseId, waveIndex) {
-  const tokenIndex = COURSE_CAPACITY + waveIndex;
-  const token = applicantTokens[tokenIndex];
-
-  if (!token) {
-    scenarioFailed.add(1);
-    fail(`first refill applicant token is missing. tokenIndex=${tokenIndex}`);
-  }
-
-  const enrollment = waitForRefillPendingEnrollment(token, courseId, waveIndex, FIRST_WAVE_POLL_TIMEOUT_SECONDS, 'first');
-  firstWaveReady.add(1);
-
-  sleep(WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS);
-
-  const stillPending = findMyPendingEnrollment(token, courseId);
-
-  if (stillPending.enrollmentId) {
-    scenarioFailed.add(1);
-    console.error(`first refill enrollment did not expire. index=${waveIndex}`);
-    console.error(`courseId=${courseId}`);
-    console.error(`body=${stillPending.rawBody}`);
-    fail('first refill enrollment did not expire');
-  }
-
-  firstWaveExpired.add(1);
-  check(enrollment, {
-    '1차 재신청 대기열 진입 성공': (body) => body && body.enrollmentId != null,
-  });
-}
-
-function handleSecondWave(courseId, waveIndex) {
-  const tokenIndex = COURSE_CAPACITY + FIRST_WAVE_APPLICANT_COUNT + waveIndex;
-  const token = applicantTokens[tokenIndex];
-
-  if (!token) {
-    scenarioFailed.add(1);
-    fail(`second refill applicant token is missing. tokenIndex=${tokenIndex}`);
-  }
-
-  sleep(WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS);
-
-  const enrollment = waitForRefillPendingEnrollment(token, courseId, waveIndex, SECOND_WAVE_POLL_TIMEOUT_SECONDS, 'second');
-  secondWaveReady.add(1);
-
-  sleep(WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS);
-
-  const stillPending = findMyPendingEnrollment(token, courseId);
-
-  if (stillPending.enrollmentId) {
-    scenarioFailed.add(1);
-    console.error(`second refill enrollment did not expire. index=${waveIndex}`);
-    console.error(`courseId=${courseId}`);
-    console.error(`body=${stillPending.rawBody}`);
-    fail('second refill enrollment did not expire');
-  }
-
-  secondWaveExpired.add(1);
-}
-
-function handleThirdWave(courseId, waveIndex) {
-  const tokenIndex = COURSE_CAPACITY + FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + waveIndex;
-  const token = applicantTokens[tokenIndex];
-
-  if (!token) {
-    scenarioFailed.add(1);
-    fail(`third wave applicant token is missing. tokenIndex=${tokenIndex}`);
-  }
-
-  sleep(WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS + WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS);
-
-  const enrollment = waitForRefillPendingEnrollment(token, courseId, waveIndex, THIRD_WAVE_POLL_TIMEOUT_SECONDS, 'third');
-  thirdWaveReady.add(1);
-
-  const confirmRes = confirmEnrollment(token, enrollment.enrollmentId);
-  const confirmBody = parseJsonOrFail(confirmRes, `third refill confirm index=${waveIndex}`);
-  const confirmed = isConfirmedEnrollment(confirmRes, confirmBody);
-
-  if (confirmed) {
-    thirdWaveConfirmed.add(1);
+  if (seatLeftMatched) {
+    finalSeatLeftMatched.add(1);
   } else {
     scenarioFailed.add(1);
-    console.error(`third refill confirm failed. index=${waveIndex}`);
-    console.error(`enrollmentId=${enrollment.enrollmentId}`);
-    console.error(`status=${confirmRes.status}`);
-    console.error(`body=${confirmRes.body}`);
+    console.error('seatLeftCount mismatch in teardown');
+    console.error(`expected=${EXPECTED_FINAL_SEAT_LEFT_COUNT}`);
+    console.error(`actual=${body.seatLeftCount}`);
+    console.error(`course=${JSON.stringify(body)}`);
   }
 
-  check(confirmRes, {
-    '3차 대기자 승격 후 결제 확정 성공': () => confirmed,
-  });
+  if (currentEnrollmentCountMatched) {
+    finalCurrentEnrollmentCountMatched.add(1);
+  } else {
+    scenarioFailed.add(1);
+    console.error('currentEnrollmentCount mismatch in teardown');
+    console.error(`expected=${EXPECTED_FINAL_CURRENT_ENROLLMENT_COUNT}`);
+    console.error(`actual=${body.currentEnrollmentCount}`);
+    console.error(`course=${JSON.stringify(body)}`);
+  }
 }
 
-function waitForRefillPendingEnrollment(token, courseId, index, timeoutSeconds, label) {
-  const startedAt = Date.now();
-  let lastEnrollBody = '';
-  let lastEnrollmentBody = '';
+function verifyWaitlistMaintained({ courseId, waveName, waveIndex, tokenIndex, counter }) {
+  const token = applicantTokens[tokenIndex];
 
-  while ((Date.now() - startedAt) / 1000 <= timeoutSeconds) {
-    const promoted = findMyPendingEnrollment(token, courseId);
-    lastEnrollmentBody = promoted.rawBody;
-
-    if (promoted.enrollmentId) {
-      return promoted;
-    }
-
-    const res = enroll(token, courseId);
-    lastEnrollBody = res.body;
-
-    const body = parseJsonOrFail(res, `${label} refill enroll index=${index}`);
-
-    if (isPendingEnrollment(res, body)) {
-      const enrollmentId = extractEnrollmentIdAsString(res.body);
-      if (!enrollmentId) {
-        scenarioFailed.add(1);
-        console.error(`refill enrollmentId is missing. label=${label}, index=${index}`);
-        console.error(`body=${res.body}`);
-        fail('refill enrollmentId is missing');
-      }
-
-      return {
-        enrollmentId,
-        rawBody: res.body,
-      };
-    }
-
-    if (!isWaitlisted(res, body)) {
-      const promotedAfterRace = findMyPendingEnrollment(token, courseId);
-      lastEnrollmentBody = promotedAfterRace.rawBody;
-
-      if (promotedAfterRace.enrollmentId) {
-        return promotedAfterRace;
-      }
-
-      if (!isRetryableRefillResponse(res)) {
-        scenarioFailed.add(1);
-        console.error(`unexpected refill enroll response. label=${label}, index=${index}`);
-        console.error(`courseId=${courseId}`);
-        console.error(`status=${res.status}`);
-        console.error(`body=${res.body}`);
-        fail('unexpected refill enroll response');
-      }
-    }
-
-    sleep(REFILL_POLL_INTERVAL_SECONDS);
+  if (!token) {
+    scenarioFailed.add(1);
+    fail(`${waveName} wave applicant token is missing. tokenIndex=${tokenIndex}`);
   }
 
-  scenarioFailed.add(1);
-  console.error(`refill pending enrollment is missing. label=${label}, index=${index}`);
-  console.error(`courseId=${courseId}`);
-  console.error(`lastEnrollmentBody=${lastEnrollmentBody}`);
-  console.error(`lastEnrollBody=${lastEnrollBody}`);
+  const beforePending = findMyPendingEnrollment(token, courseId);
 
-  fail('refill pending enrollment is missing');
+  if (beforePending.enrollmentId) {
+    scenarioFailed.add(1);
+    console.error(`${waveName} wave applicant unexpectedly has pending enrollment before retry. index=${waveIndex}`);
+    console.error(`courseId=${courseId}`);
+    console.error(`tokenIndex=${tokenIndex}`);
+    console.error(`body=${beforePending.rawBody}`);
+    fail(`${waveName} wave applicant unexpectedly has pending enrollment before retry`);
+  }
+
+  const res = enroll(token, courseId);
+  const body = parseJsonOrFail(res, `${waveName} wave waitlist retry index=${waveIndex}`);
+
+  const waitlisted = isWaitlisted(res, body);
+
+  const checks = {};
+  checks[`${waveName} wave 대기열 유지`] = () => waitlisted;
+
+  check(res, checks);
+
+  if (!waitlisted) {
+    scenarioFailed.add(1);
+
+    console.error(`${waveName} wave applicant was not kept waitlisted. index=${waveIndex}`);
+    console.error(`courseId=${courseId}`);
+    console.error(`tokenIndex=${tokenIndex}`);
+    console.error(`status=${res.status}`);
+    console.error(`body=${res.body}`);
+
+    if (isPendingEnrollment(res, body)) {
+      console.error(
+          `${waveName} wave applicant received PENDING enrollment. ` +
+          'If this is intended behavior, use the auto-promotion scenario instead.',
+      );
+    }
+
+    fail(`${waveName} wave applicant was not kept waitlisted`);
+  }
+
+  const afterPending = findMyPendingEnrollment(token, courseId);
+
+  if (afterPending.enrollmentId) {
+    scenarioFailed.add(1);
+    console.error(`${waveName} wave applicant unexpectedly has pending enrollment after retry. index=${waveIndex}`);
+    console.error(`courseId=${courseId}`);
+    console.error(`tokenIndex=${tokenIndex}`);
+    console.error(`body=${afterPending.rawBody}`);
+    fail(`${waveName} wave applicant unexpectedly has pending enrollment after retry`);
+  }
+
+  counter.add(1);
 }
 
 function findMyPendingEnrollment(token, courseId) {
@@ -443,10 +427,6 @@ function extractPendingEnrollmentIdForCourse(body, courseId) {
   }
 
   return null;
-}
-
-function isRetryableRefillResponse(res) {
-  return res.status === 401 || res.status === 409 || res.status >= 500;
 }
 
 function signup(body) {
@@ -681,8 +661,8 @@ function assertApplicantTokensValidLongEnough() {
       WAIT_BEFORE_FIRST_REFILL_SECONDS +
       WAIT_BETWEEN_WAVE1_AND_WAVE2_SECONDS +
       WAIT_BETWEEN_WAVE2_AND_WAVE3_SECONDS +
-      Math.max(FIRST_WAVE_POLL_TIMEOUT_SECONDS, SECOND_WAVE_POLL_TIMEOUT_SECONDS, THIRD_WAVE_POLL_TIMEOUT_SECONDS) +
       120;
+
   const tokenIndexes = [
     0,
     COURSE_CAPACITY - 1,
@@ -707,7 +687,7 @@ function assertApplicantTokensValidLongEnough() {
 
     if (remainingTtlSeconds <= requiredTtlSeconds) {
       fail(
-          `applicant token expires before refill can finish. ` +
+          `applicant token expires before scenario can finish. ` +
           `tokenIndex=${tokenIndex}, remainingTtlSeconds=${remainingTtlSeconds}, ` +
           `requiredTtlSeconds=${requiredTtlSeconds}. ` +
           `Restart the application with MEMBER_TOKEN_GENERATOR_ENABLED=true to regenerate k6/tokens.json before running this scenario.`,
@@ -787,15 +767,23 @@ function parseJsonOrFail(res, context) {
 }
 
 function isPendingEnrollment(res, body) {
-  return (res.status === 200 || res.status === 201) && body && body.enrollmentId != null && body.status === 'PENDING';
+  return (res.status === 200 || res.status === 201) &&
+      body &&
+      body.enrollmentId != null &&
+      body.status === 'PENDING';
 }
 
 function isWaitlisted(res, body) {
-  return (res.status === 200 || res.status === 201 || res.status === 202) && body && body.status === 'WAITLISTED';
+  return (res.status === 200 || res.status === 201 || res.status === 202) &&
+      body &&
+      body.status === 'WAITLISTED';
 }
 
 function isConfirmedEnrollment(res, body) {
-  return (res.status === 200 || res.status === 201) && body && body.enrollmentId != null && body.status === 'CONFIRMED';
+  return (res.status === 200 || res.status === 201) &&
+      body &&
+      body.enrollmentId != null &&
+      body.status === 'CONFIRMED';
 }
 
 function validateConfiguration() {
@@ -814,14 +802,26 @@ function validateConfiguration() {
     );
   }
 
-  if (FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + THIRD_WAVE_APPLICANT_COUNT > APPLICANT_COUNT - COURSE_CAPACITY) {
+  const waveApplicantCount =
+      FIRST_WAVE_APPLICANT_COUNT +
+      SECOND_WAVE_APPLICANT_COUNT +
+      THIRD_WAVE_APPLICANT_COUNT;
+
+  const waitlistedCount = APPLICANT_COUNT - COURSE_CAPACITY;
+
+  if (waveApplicantCount > waitlistedCount) {
     fail(
-        `FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + THIRD_WAVE_APPLICANT_COUNT must be less than or equal to waitlisted count. ` +
+        `FIRST_WAVE_APPLICANT_COUNT + SECOND_WAVE_APPLICANT_COUNT + THIRD_WAVE_APPLICANT_COUNT ` +
+        `must be less than or equal to waitlisted count. ` +
         `firstWaveApplicantCount=${FIRST_WAVE_APPLICANT_COUNT}, ` +
         `secondWaveApplicantCount=${SECOND_WAVE_APPLICANT_COUNT}, ` +
         `thirdWaveApplicantCount=${THIRD_WAVE_APPLICANT_COUNT}, ` +
-        `waitlistedCount=${APPLICANT_COUNT - COURSE_CAPACITY}`,
+        `waitlistedCount=${waitlistedCount}`,
     );
+  }
+
+  if (VUS <= 0) {
+    fail(`VUS must be positive. VUS=${VUS}`);
   }
 }
 
