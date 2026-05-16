@@ -22,6 +22,30 @@ class EnrollmentRepositoryImpl(
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollmentJpaRepository.findAllByMemberId(memberId)
         .map(EnrollmentEntity::toDomain)
 
+    override fun findByMemberIdAndCourseId(
+        memberId: Long,
+        courseId: Long,
+    ): EnrollmentModel? = enrollmentJpaRepository.findByMemberIdAndCourseId(
+        memberId = memberId,
+        courseId = courseId,
+    )
+        ?.toDomain()
+
+    override fun findAllByCourseIdsAndMemberIds(
+        courseIds: Set<Long>,
+        memberIds: Set<Long>,
+    ): List<EnrollmentModel> {
+        if (courseIds.isEmpty() || memberIds.isEmpty()) {
+            return emptyList()
+        }
+
+        return enrollmentJpaRepository.findAllByCourseIdInAndMemberIdIn(
+            courseIds = courseIds,
+            memberIds = memberIds,
+        )
+            .map(EnrollmentEntity::toDomain)
+    }
+
     override fun findExpiredPaymentPendingTargets(
         now: LocalDateTime,
         limit: Int,

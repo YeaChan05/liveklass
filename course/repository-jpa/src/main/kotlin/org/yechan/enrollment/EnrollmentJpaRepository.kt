@@ -8,9 +8,16 @@ import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
 interface EnrollmentJpaRepository : JpaRepository<EnrollmentEntity, Long> {
-    @Query("select e from EnrollmentEntity e where e.memberId = :memberId")
-    fun findAllByMemberId(
-        @Param("memberId") memberId: Long,
+    fun findAllByMemberId(memberId: Long): List<EnrollmentEntity>
+
+    fun findByMemberIdAndCourseId(
+        memberId: Long,
+        courseId: Long,
+    ): EnrollmentEntity?
+
+    fun findAllByCourseIdInAndMemberIdIn(
+        courseIds: Collection<Long>,
+        memberIds: Collection<Long>,
     ): List<EnrollmentEntity>
 
     @Query(
