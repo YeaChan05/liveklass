@@ -1,8 +1,6 @@
 package org.yechan.enrollment
 
-import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
-import java.sql.PreparedStatement
 import java.time.LocalDateTime
 
 class EnrollmentBulkWriterImpl(
@@ -13,15 +11,21 @@ class EnrollmentBulkWriterImpl(
 
         jdbcTemplate.batchUpdate(
             """
-        INSERT INTO enrollments (
-            id,
-            course_id,
-            member_id,
-            status,
-            payment_pending_started_at,
-            payment_pending_expires_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO enrollments (
+                id,
+                course_id,
+                member_id,
+                status,
+                payment_pending_started_at,
+                payment_pending_expires_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                course_id = VALUES(course_id),
+                member_id = VALUES(member_id),
+                status = VALUES(status),
+                payment_pending_started_at = VALUES(payment_pending_started_at),
+                payment_pending_expires_at = VALUES(payment_pending_expires_at)
             """.trimIndent(),
             enrollments,
             enrollments.size,
@@ -39,36 +43,68 @@ class EnrollmentBulkWriterImpl(
         courseIds: Collection<Long>,
         now: LocalDateTime,
     ): Map<Long, Int> {
-        val targets = courseIds
-            .distinct()
-            .ifEmpty { return emptyMap() }
+        val targets = courseIds.distinct()
+        if (targets.isEmpty()) return emptyMap()
 
-        val updateCounts = jdbcTemplate.batchUpdate(
-            """
-        UPDATE enrollments
-        SET status = ?
-        WHERE course_id = ?
-          AND status = ?
-          AND payment_pending_expires_at <= ?
-            """.trimIndent(),
-            object : BatchPreparedStatementSetter {
-                override fun setValues(
-                    ps: PreparedStatement,
-                    i: Int,
-                ) {
-                    ps.setString(1, EnrollmentStatus.EXPIRED.name)
-                    ps.setLong(2, targets[i])
-                    ps.setString(3, EnrollmentStatus.PENDING.name)
-                    ps.setObject(4, now)
-                }
-
-                override fun getBatchSize(): Int = targets.size
-            },
+        val expiredCounts = findExpiredCountsByCourseIds(
+            courseIds = targets,
+            now = now,
         )
 
-        return targets
-            .zip(updateCounts.toList())
-            .filter { (_, expiredCount) -> expiredCount > 0 }
-            .toMap()
+        if (expiredCounts.isEmpty()) return emptyMap()
+
+        updateExpiredByCourseIds(
+            courseIds = expiredCounts.keys,
+            now = now,
+        )
+
+        return expiredCounts
+    }
+
+    private fun findExpiredCountsByCourseIds(
+        courseIds: Collection<Long>,
+        now: LocalDateTime,
+    ): Map<Long, Int> {
+        val placeholders = courseIds.joinToString(",") { "?" }
+
+        return jdbcTemplate.query(
+            """
+            SELECT course_id, COUNT(*) AS expired_count
+            FROM enrollments
+            WHERE course_id IN ($placeholders)
+              AND status = ?
+              AND payment_pending_expires_at <= ?
+            GROUP BY course_id
+            """.trimIndent(),
+            { rs, _ ->
+                rs.getLong("course_id") to rs.getInt("expired_count")
+            },
+            *courseIds.toTypedArray(),
+            EnrollmentStatus.PENDING.name,
+            now,
+        ).toMap()
+    }
+
+    private fun updateExpiredByCourseIds(
+        courseIds: Collection<Long>,
+        now: LocalDateTime,
+    ) {
+        val placeholders = courseIds.joinToString(",") { "?" }
+
+        jdbcTemplate.update(
+            """
+            UPDATE enrollments
+            SET status = ?
+            WHERE course_id IN ($placeholders)
+              AND status = ?
+              AND payment_pending_expires_at <= ?
+            """.trimIndent(),
+            *listOf(
+                EnrollmentStatus.EXPIRED.name,
+                *courseIds.toTypedArray(),
+                EnrollmentStatus.PENDING.name,
+                now,
+            ).toTypedArray<Any>(),
+        )
     }
 }
