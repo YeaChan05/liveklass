@@ -1,45 +1,78 @@
 package org.yechan.enrollment
 
+import org.intellij.lang.annotations.Language
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
+import java.time.Duration
 import java.time.Instant
 
 class EnrollmentWaitlistRedisRepository(
     private val redisTemplate: StringRedisTemplate,
+    private val ttl: Duration,
 ) : EnrollmentWaitlistRepository {
     override fun enqueue(
         courseId: Long,
         memberId: Long,
         requestedAt: Instant,
     ) {
-        zSetOperations.add(
-            EnrollmentWaitlistRedisKey.byCourseId(courseId).value,
-            EnrollmentWaitlistRedisValue.from(memberId, requestedAt).serialize(),
-            requestedAt.toEpochMilli().toDouble(),
-        )
-        zSetOperations.add(
-            EnrollmentWaitlistRedisKey.courseIds().value,
+        redisTemplate.execute(
+            ENQUEUE_SCRIPT,
+            listOf(
+                EnrollmentWaitlistRedisKey.byCourseId(courseId).value,
+                EnrollmentWaitlistRedisKey.courseIds().value,
+            ),
+            memberId.toString(),
+            requestedAt.toEpochMilli().toString(),
+            ttl.toMillis().toString(),
             courseId.toString(),
-            courseId.toDouble(),
         )
     }
 
     override fun pop(courseId: Long): EnrollmentWaitlistEntry? {
         val key = EnrollmentWaitlistRedisKey.byCourseId(courseId)
-        val member = zSetOperations.popMin(key.value)
-            ?.value
-            ?: return null
+        val popped = redisTemplate.execute(
+            POP_AND_CLEANUP_SCRIPT,
+            listOf(
+                key.value,
+                EnrollmentWaitlistRedisKey.courseIds().value,
+                EnrollmentWaitlistRedisKey.soldOut(courseId).value,
+            ),
+            courseId.toString(),
+            ttl.toMillis().toString(),
+        ).orEmpty()
 
-        cleanupCourseId(courseId)
+        if (popped.size < 2) {
+            return null
+        }
 
-        return EnrollmentWaitlistRedisValue.deserialize(member).toDomain(courseId)
+        val memberId = popped[0].toString().toLongOrNull() ?: return null
+        val requestedAt = popped[1].toString().toDoubleOrNull()?.toLong() ?: return null
+
+        return EnrollmentWaitlistEntry(
+            courseId = courseId,
+            memberId = memberId,
+            requestedAt = Instant.ofEpochMilli(requestedAt),
+        )
     }
 
     override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = findCourseIds()
         .flatMap { courseId ->
-            zSetOperations.range(EnrollmentWaitlistRedisKey.byCourseId(courseId).value, 0, -1)
+            redisTemplate.opsForZSet()
+                .rangeWithScores(EnrollmentWaitlistRedisKey.byCourseId(courseId).value, 0, -1)
                 .orEmpty()
-                .mapNotNull { serialized ->
-                    EnrollmentWaitlistRedisValue.deserialize(serialized).toDomain(courseId)
+                .mapNotNull { entry ->
+                    val currentMemberId = entry.value?.toLongOrNull() ?: return@mapNotNull null
+                    if (currentMemberId != memberId) {
+                        return@mapNotNull null
+                    }
+
+                    EnrollmentWaitlistEntry(
+                        courseId = courseId,
+                        memberId = currentMemberId,
+                        requestedAt = Instant.ofEpochMilli(
+                            entry.score?.toLong() ?: return@mapNotNull null,
+                        ),
+                    )
                 }
         }
         .filter { it.memberId == memberId }
@@ -49,19 +82,40 @@ class EnrollmentWaitlistRedisRepository(
         courseId: Long,
         memberId: Long,
     ) {
-        val key = EnrollmentWaitlistRedisKey.byCourseId(courseId)
-        val serializedMemberIds = zSetOperations.range(key.value, 0, -1)
-            .orEmpty()
-            .filter { EnrollmentWaitlistRedisValue.deserialize(it).memberId == memberId }
-
-        serializedMemberIds.forEach { zSetOperations.remove(key.value, it) }
-        cleanupCourseId(courseId)
+        redisTemplate.execute(
+            REMOVE_AND_CLEANUP_SCRIPT,
+            listOf(
+                EnrollmentWaitlistRedisKey.byCourseId(courseId).value,
+                EnrollmentWaitlistRedisKey.courseIds().value,
+                EnrollmentWaitlistRedisKey.soldOut(courseId).value,
+            ),
+            memberId.toString(),
+            ttl.toMillis().toString(),
+        )
     }
 
-    override fun findCourseIds(): Set<Long> = zSetOperations.range(EnrollmentWaitlistRedisKey.courseIds().value, 0, -1)
-        .orEmpty()
-        .mapNotNull(String::toLongOrNull)
-        .toCollection(linkedSetOf())
+    override fun findCourseIds(): Set<Long> {
+        val courseIds = redisTemplate.opsForZSet()
+            .range(EnrollmentWaitlistRedisKey.courseIds().value, 0, -1)
+            .orEmpty()
+            .mapNotNull { it.toLongOrNull() }
+            .toCollection(linkedSetOf())
+
+        val liveCourseIds = linkedSetOf<Long>()
+        courseIds.forEach { courseId ->
+            val waitlistKey = EnrollmentWaitlistRedisKey.byCourseId(courseId).value
+            if (redisTemplate.hasKey(waitlistKey) == true) {
+                liveCourseIds += courseId
+                return@forEach
+            }
+
+            redisTemplate.opsForZSet()
+                .remove(EnrollmentWaitlistRedisKey.courseIds().value, courseId.toString())
+            redisTemplate.delete(EnrollmentWaitlistRedisKey.soldOut(courseId).value)
+        }
+
+        return liveCourseIds
+    }
 
     override fun isSoldOut(courseId: Long): Boolean = redisTemplate.hasKey(
         EnrollmentWaitlistRedisKey.soldOut(courseId).value,
@@ -78,18 +132,6 @@ class EnrollmentWaitlistRedisRepository(
         redisTemplate.delete(
             EnrollmentWaitlistRedisKey.soldOut(courseId).value,
         )
-    }
-
-    private val zSetOperations
-        get() = redisTemplate.opsForZSet()
-
-    private fun cleanupCourseId(courseId: Long) {
-        val key = EnrollmentWaitlistRedisKey.byCourseId(courseId)
-        if (zSetOperations.range(key.value, 0, 0).isNullOrEmpty()) {
-            redisTemplate.delete(key.value)
-            zSetOperations.remove(EnrollmentWaitlistRedisKey.courseIds().value, courseId.toString())
-            clearSoldOut(courseId)
-        }
     }
 }
 
@@ -123,39 +165,60 @@ private sealed interface EnrollmentWaitlistRedisKey {
     }
 }
 
-private data class EnrollmentWaitlistRedisValue(
-    val memberId: Long,
-    val requestedAt: Instant,
-) {
-    fun serialize(): String = listOf(
-        memberId.toString().padStart(MEMBER_ID_WIDTH, '0'),
-        requestedAt.toString(),
-    ).joinToString(SEPARATOR)
-
-    fun toDomain(courseId: Long): EnrollmentWaitlistEntry = EnrollmentWaitlistEntry(
-        courseId = courseId,
-        memberId = memberId,
-        requestedAt = requestedAt,
+private val ENQUEUE_SCRIPT = DefaultRedisScript<Long>().apply {
+    @Language("Lua")
+    val script = """
+        redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1])
+        redis.call('PEXPIRE', KEYS[1], ARGV[3])
+        redis.call('ZADD', KEYS[2], ARGV[4], ARGV[4])
+        return 1
+        """
+    setScriptText(
+        script.trimIndent(),
     )
+    resultType = Long::class.java
+}
 
-    companion object {
-        private const val SEPARATOR = "|"
-        private const val MEMBER_ID_WIDTH = 20
+private val REMOVE_AND_CLEANUP_SCRIPT = DefaultRedisScript<Long>().apply {
+    @Language("Lua")
+    val script = """
+        redis.call('ZREM', KEYS[1], ARGV[1])
+        if redis.call('ZCARD', KEYS[1]) == 0 then
+            redis.call('DEL', KEYS[1])
+            redis.call('ZREM', KEYS[2], string.match(KEYS[1], ":(%d+)$") or "")
+            redis.call('DEL', KEYS[3])
+        else
+            redis.call('PEXPIRE', KEYS[1], ARGV[2])
+            redis.call('PEXPIRE', KEYS[3], ARGV[2])
+        end
+        return 1
+        """
+    setScriptText(
+        script.trimIndent(),
+    )
+    resultType = Long::class.java
+}
 
-        fun from(
-            memberId: Long,
-            requestedAt: Instant,
-        ): EnrollmentWaitlistRedisValue = EnrollmentWaitlistRedisValue(
-            memberId = memberId,
-            requestedAt = requestedAt,
-        )
-
-        fun deserialize(value: String): EnrollmentWaitlistRedisValue {
-            val parts = value.split(SEPARATOR, limit = 2)
-            return EnrollmentWaitlistRedisValue(
-                memberId = parts[0].toLong(),
-                requestedAt = Instant.parse(parts[1]),
-            )
-        }
-    }
+private val POP_AND_CLEANUP_SCRIPT = DefaultRedisScript<List<Any>>().apply {
+    @Language("Lua")
+    val script = """
+        local popped = redis.call('ZPOPMIN', KEYS[1], 1)
+        if (popped == nil) or (#popped == 0) then
+            return {}
+        end
+        if redis.call('ZCARD', KEYS[1]) == 0 then
+            redis.call('DEL', KEYS[1])
+            redis.call('ZREM', KEYS[2], string.match(KEYS[1], ":(%d+)$") or "")
+            redis.call('DEL', KEYS[3])
+        else
+            redis.call('PEXPIRE', KEYS[1], ARGV[2])
+            redis.call('PEXPIRE', KEYS[3], ARGV[2])
+        end
+        return popped
+        """
+    setScriptText(
+        script.trimIndent(),
+    )
+    @Suppress("UNCHECKED_CAST")
+    resultType = List::class.java as Class<List<Any>>
 }
