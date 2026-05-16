@@ -27,13 +27,20 @@ class EnrollmentWaitlistSchedulerTest {
     private val courseBulkWriter = courseRepository
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(memberRepository, courseRepository)
-    private val enrollmentTransactionService = EnrollmentTransactionService(courseRepository, enrollmentRepository)
-    private val enrollmentService = EnrollmentService(enrollmentTransactionService, enrollmentRepository, waitlistRepository)
+    private val enrollmentTransactionService =
+        EnrollmentTransactionService(courseRepository, enrollmentRepository)
+    private val enrollmentService =
+        EnrollmentService(enrollmentTransactionService, waitlistRepository)
+    private val enrollmentWaitlistProcessor =
+        EnrollmentWaitlistPromotionService(
+            courseBulkWriter,
+            enrollmentRepository,
+            enrollmentRepository,
+        )
     private val scheduler = EnrollmentWaitlistScheduler(
         waitlistRepository,
         courseRepository,
-        courseBulkWriter,
-        enrollmentRepository,
+        enrollmentWaitlistProcessor,
     )
 
     @Test
@@ -97,7 +104,12 @@ class EnrollmentWaitlistSchedulerTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val firstEnrollment =
-            enrollmentService.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+            enrollmentService.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
         val firstWaitlisted =
             enrollmentService.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
         val secondWaitlisted =
@@ -113,7 +125,8 @@ class EnrollmentWaitlistSchedulerTest {
         scheduler.processWaitlists()
 
         val changedCourse = courseService.getCourse(course.courseId)
-        val promotedEnrollments = enrollmentRepository.enrollments.values.filter { it.memberId == 3L }
+        val promotedEnrollments =
+            enrollmentRepository.enrollments.values.filter { it.memberId == 3L }
 
         assertThat(firstWaitlisted).isEqualTo(
             EnrollmentEnrollResult.Waitlisted(
@@ -144,17 +157,19 @@ class EnrollmentWaitlistSchedulerTest {
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
 
-        val failingScheduler = EnrollmentWaitlistScheduler(
-            waitlistRepository,
-            courseRepository,
+        val failingProcessor = EnrollmentWaitlistPromotionService(
             object : CourseBulkWriter {
-                override fun reserveSeatsBulk(courseIds: Map<Long, Int>) {
-                    throw IllegalStateException("좌석 예약 실패")
-                }
+                override fun reserveSeatsBulk(courseIds: Map<Long, Int>): Unit = throw IllegalStateException("좌석 예약 실패")
 
                 override fun releaseSeatsBulk(courseIds: Map<Long, Int>) = Unit
             },
             enrollmentRepository,
+            enrollmentRepository,
+        )
+        val failingScheduler = EnrollmentWaitlistScheduler(
+            waitlistRepository,
+            courseRepository,
+            failingProcessor,
         )
 
         assertThatThrownBy { failingScheduler.processWaitlists() }
@@ -174,7 +189,12 @@ class EnrollmentWaitlistSchedulerTest {
         val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
-        val enrollment = enrollmentService.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+        val enrollment = enrollmentService.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        ).enrollment
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:00Z"))
 
         enrollmentService.cancelEnrollment(
@@ -184,20 +204,55 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
+        val customProcessor = EnrollmentWaitlistPromotionService(
+            courseBulkWriter,
+            enrollmentRepository,
+            enrollmentRepository,
+            Duration.ofMinutes(3),
+        )
         val customScheduler = EnrollmentWaitlistScheduler(
             waitlistRepository,
             courseRepository,
-            courseBulkWriter,
-            enrollmentRepository,
-            Duration.ofMinutes(3),
+            customProcessor,
         )
 
         customScheduler.processWaitlists()
 
         val promotedEnrollment = enrollmentRepository.enrollments.values.first { it.memberId == 3L }
 
-        assertThat(Duration.between(promotedEnrollment.paymentPendingStartedAt, promotedEnrollment.paymentPendingExpiresAt))
+        assertThat(
+            Duration.between(
+                promotedEnrollment.paymentPendingStartedAt,
+                promotedEnrollment.paymentPendingExpiresAt,
+            ),
+        )
             .isEqualTo(Duration.ofMinutes(3))
+    }
+
+    @Test
+    fun `만료된 신청이 남아 있어도 스케줄러는 같은 row를 재사용한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val expiredEnrollment = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.courseId,
+                memberId = 2L,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+        waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
+
+        scheduler.processWaitlists()
+
+        val reactivatedEnrollment =
+            enrollmentRepository.findById(requireNotNull(expiredEnrollment.enrollmentId))
+
+        assertThat(reactivatedEnrollment?.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(reactivatedEnrollment?.enrollmentId).isEqualTo(expiredEnrollment.enrollmentId)
+        assertThat(courseService.getCourse(course.courseId).seatLeftCount).isEqualTo(0)
     }
 
     @Test
