@@ -1,10 +1,10 @@
 package org.yechan.enrollment
 
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.yechan.RedisIntegrationTest
+import java.time.Duration
 import java.time.Instant
 
 class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
@@ -13,7 +13,7 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
     @BeforeEach
     fun setUp() {
         flushAll()
-        repository = EnrollmentWaitlistRedisRepository(redisTemplate)
+        repository = EnrollmentWaitlistRedisRepository(redisTemplate, Duration.ofDays(1))
     }
 
     @Test
@@ -52,6 +52,22 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
     }
 
     @Test
+    fun `scheduler가 못 지워도 ttl로 waitlist와 soldOut이 만료된다`() {
+        repository = EnrollmentWaitlistRedisRepository(redisTemplate, Duration.ofSeconds(1))
+
+        repository.markSoldOut(1L)
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+
+        assertThat(repository.isSoldOut(1L)).isTrue()
+        assertThat(repository.findCourseIds()).containsExactly(1L)
+
+        Thread.sleep(1_200)
+
+        assertThat(repository.findCourseIds()).isEmpty()
+        assertThat(repository.isSoldOut(1L)).isFalse()
+    }
+
+    @Test
     fun `마지막 대기열이 제거되면 매진 표시도 해제된다`() {
         repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
         repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
@@ -82,6 +98,18 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
         assertThat(result[1].courseId).isEqualTo(2L)
         assertThat(result[1].memberId).isEqualTo(10L)
         assertThat(result[1].requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:01Z"))
+    }
+
+    @Test
+    fun `같은 회원이 같은 강의에 다시 등록하면 기존 대기열을 갱신한다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:05Z"))
+
+        val result = repository.findByMemberId(10L)
+
+        assertThat(result).hasSize(1)
+        assertThat(result.single().requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:05Z"))
+        assertThat(repository.pop(1L)?.requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:05Z"))
     }
 
     @Test
@@ -314,7 +342,7 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
     }
 
     @Test
-    fun `잘못된 대기열 값이 저장되어 있으면 pop 시 예외가 발생한다`() {
+    fun `잘못된 대기열 값이 저장되어 있으면 pop은 null을 반환하고 정리한다`() {
         // Arrange
         redisTemplate.opsForZSet().add(
             "course:enrollment:waitlist:course:1",
@@ -328,10 +356,28 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
             1.0,
         )
 
-        // Act & Assert
-        assertThatThrownBy {
-            repository.pop(1L)
-        }
-            .isInstanceOf(RuntimeException::class.java)
+        // Act
+        val result = repository.pop(1L)
+
+        // Assert
+        assertThat(result).isNull()
+        assertThat(repository.findCourseIds()).isEmpty()
+    }
+
+    @Test
+    fun `대기열에서 제거된 강의의 수강신청은 조회되지 않는다`() {
+        // Arrange
+        val courseId = 100L
+
+        redisTemplate.opsForValue().set(
+            "course:enrollment:waitlist:course:$courseId:sold-out",
+            "true",
+        )
+
+        // Act
+        repository.clearSoldOut(courseId)
+
+        // Assert
+        assertThat(redisTemplate.hasKey("course:enrollment:waitlist:course:$courseId:sold-out")).isFalse()
     }
 }
