@@ -2,6 +2,8 @@ package org.yechan.enrollment
 
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hibernate.exception.ConstraintViolationException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -88,7 +90,7 @@ class EnrollmentRepositoryImplTest {
     }
 
     @Test
-    fun `회원 아이디 조회는 해당 회원의 수강 신청만 반환한다`() {
+    fun `회원 아이디 조회는 해당 회원의 수강 신청 목록을 반환한다`() {
         val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
         val member = persistMember(email = "student@example.com")
         val otherMember = persistMember(email = "other@example.com")
@@ -103,6 +105,93 @@ class EnrollmentRepositoryImplTest {
         val enrollments = enrollmentRepository.findByMemberId(member.id!!)
 
         assertThat(enrollments).containsExactly(memberEnrollment)
+    }
+
+    @Test
+    fun `회원은 서로 다른 강의에 각각 신청할 수 있다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val firstCourse = persistCourse(creator)
+        val secondCourse = persistCourse(creator)
+        val firstEnrollment = enrollmentRepository.save(
+            EnrollmentModelData(courseId = firstCourse.id!!, memberId = member.id!!),
+        )
+        val secondEnrollment = enrollmentRepository.save(
+            EnrollmentModelData(courseId = secondCourse.id!!, memberId = member.id!!),
+        )
+
+        val enrollments = enrollmentRepository.findByMemberId(member.id!!)
+        val found = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = secondCourse.id!!,
+        )
+
+        assertThat(enrollments).containsExactly(firstEnrollment, secondEnrollment)
+        assertThat(found).isEqualTo(secondEnrollment)
+    }
+
+    @Test
+    fun `같은 강의와 회원의 중복 신청은 저장되지 않는다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val course = persistCourse(creator)
+
+        val pending = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        assertThatThrownBy {
+            enrollmentRepository.save(
+                EnrollmentModelData(
+                    courseId = course.id!!,
+                    memberId = member.id!!,
+                    status = EnrollmentStatus.EXPIRED,
+                ),
+            )
+            entityManager.flush()
+        }.isInstanceOf(ConstraintViolationException::class.java)
+
+        entityManager.clear()
+        val enrollment = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = course.id!!,
+        )
+
+        assertThat(enrollment).isEqualTo(pending)
+    }
+
+    @Test
+    fun `같은 row id로 저장하면 상태를 갱신할 수 있다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val course = persistCourse(creator)
+
+        val pending = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        val expired = enrollmentRepository.save(
+            EnrollmentModelData(
+                enrollmentId = pending.enrollmentId,
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val enrollment = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = course.id!!,
+        )
+
+        assertThat(expired.enrollmentId).isEqualTo(pending.enrollmentId)
+        assertThat(enrollment).isEqualTo(expired)
     }
 
     private fun persistMember(
