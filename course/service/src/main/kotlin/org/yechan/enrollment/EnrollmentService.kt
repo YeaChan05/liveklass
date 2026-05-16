@@ -1,33 +1,32 @@
 package org.yechan.enrollment
 
-import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
-sealed interface EnrollmentEnrollResult {
-    data class Enrolled(
-        val enrollment: EnrollmentResult,
-    ) : EnrollmentEnrollResult
+interface EnrollmentUseCase {
+    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult
 
-    data class Waitlisted(
-        val courseId: Long,
-        val memberId: Long,
-    ) : EnrollmentEnrollResult
+    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
+
+    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
+
+    fun cancelWaitlist(command: EnrollmentWaitlistCommand)
+
+    fun getMyEnrollments(memberId: Long): List<EnrollmentResult>
+
+    fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult>
 }
 
-data class EnrollmentWaitlistResult(
-    val courseId: Long,
-    val memberId: Long,
-    val requestedAt: Instant,
-)
-
-open class EnrollmentService(
+class EnrollmentService(
     private val enrollmentTransactionService: EnrollmentTransactionService,
-    private val enrollmentRepository: EnrollmentRepository,
     private val waitlistRepository: EnrollmentWaitlistRepository,
 ) : EnrollmentUseCase {
     override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult {
         val memberId = command.memberId
         val courseId = command.courseId
+
+        enrollmentTransactionService.findPendingOrConfirmedEnrollment(command)?.let {
+            return EnrollmentEnrollResult.Enrolled(it)
+        }
 
         if (waitlistRepository.isSoldOut(courseId)) {
             enqueueWaitlist(courseId, memberId)
@@ -39,10 +38,7 @@ open class EnrollmentService(
 
         return when (val result = enrollmentTransactionService.enroll(command)) {
             is EnrollmentEnrollTransactionResult.Enrolled -> EnrollmentEnrollResult.Enrolled(result.enrollment)
-
-            EnrollmentEnrollTransactionResult.SoldOut -> {
-                rejectSoldOut(courseId, memberId)
-            }
+            EnrollmentEnrollTransactionResult.SoldOut -> rejectSoldOut(courseId, memberId)
         }
     }
 
@@ -58,10 +54,8 @@ open class EnrollmentService(
         waitlistRepository.remove(command.courseId, command.memberId)
     }
 
-    @Transactional(readOnly = true)
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentTransactionService.getMyEnrollments(memberId)
 
-    @Transactional(readOnly = true)
     override fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult> = waitlistRepository.findByMemberId(memberId)
         .map {
             EnrollmentWaitlistResult(
@@ -101,6 +95,23 @@ open class EnrollmentService(
         )
     }
 }
+
+sealed interface EnrollmentEnrollResult {
+    data class Enrolled(
+        val enrollment: EnrollmentResult,
+    ) : EnrollmentEnrollResult
+
+    data class Waitlisted(
+        val courseId: Long,
+        val memberId: Long,
+    ) : EnrollmentEnrollResult
+}
+
+data class EnrollmentWaitlistResult(
+    val courseId: Long,
+    val memberId: Long,
+    val requestedAt: Instant,
+)
 
 val EnrollmentEnrollResult.enrollment: EnrollmentResult
     get() = when (this) {

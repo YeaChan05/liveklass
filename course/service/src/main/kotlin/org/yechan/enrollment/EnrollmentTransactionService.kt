@@ -8,67 +8,56 @@ import org.yechan.course.EnrollmentNotFoundException
 import java.time.Duration
 import java.time.LocalDateTime
 
-interface EnrollmentUseCase {
-    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult
-
-    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
-
-    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
-
-    fun cancelWaitlist(command: EnrollmentWaitlistCommand)
-
-    fun getMyEnrollments(memberId: Long): List<EnrollmentResult>
-
-    fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult>
-}
-
-sealed interface EnrollmentEnrollTransactionResult {
-    data class Enrolled(
-        val enrollment: EnrollmentResult,
-    ) : EnrollmentEnrollTransactionResult
-
-    data object SoldOut : EnrollmentEnrollTransactionResult
-}
-
-data class EnrollmentCancelResult(
-    val enrollment: EnrollmentResult,
-    val courseId: Long,
-)
-
 @Transactional(readOnly = true)
 class EnrollmentTransactionService(
     private val courseRepository: CourseRepository,
     private val enrollmentRepository: EnrollmentRepository,
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) {
+    fun findPendingOrConfirmedEnrollment(command: EnrollCourseCommand): EnrollmentResult? = enrollmentRepository.findByMemberIdAndCourseId(
+        memberId = command.memberId,
+        courseId = command.courseId,
+    )?.takeIf(EnrollmentModel::isPendingOrConfirmed)
+        ?.toResult()
+
+    fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+
     @Transactional
     fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
         val memberId = command.memberId
         val courseId = command.courseId
+        val now = LocalDateTime.now()
 
-        if (!courseRepository.reserveSeatIfAvailable(courseId)) {
-            return EnrollmentEnrollTransactionResult.SoldOut
+        val existing =
+            enrollmentRepository.findByMemberIdAndCourseId(
+                memberId = memberId,
+                courseId = courseId,
+            )
+
+        existing?.let { enrollment ->
+            return when (enrollment.status) {
+                EnrollmentStatus.PENDING,
+                EnrollmentStatus.CONFIRMED,
+                -> EnrollmentEnrollTransactionResult.Enrolled(
+                    enrollment.toResult(),
+                )
+
+                EnrollmentStatus.CANCELLED,
+                EnrollmentStatus.EXPIRED,
+                -> reEnroll(
+                    enrollment = enrollment,
+                    courseId = courseId,
+                    memberId = memberId,
+                    now = now,
+                )
+            }
         }
 
-        val paymentPendingStartedAt = LocalDateTime.now()
-        val enrollment = EnrollmentModelData(
-            enrollmentId = null,
+        return createEnrollment(
             courseId = courseId,
             memberId = memberId,
-            status = EnrollmentStatus.PENDING,
-            paymentPendingStartedAt = paymentPendingStartedAt,
-            paymentPendingExpiresAt = paymentPendingStartedAt.plus(paymentPendingExpiresIn),
+            now = now,
         )
-
-        return EnrollmentEnrollTransactionResult.Enrolled(
-            enrollmentRepository.save(enrollment).toResult(),
-        )
-    }
-
-    fun requireOpenCourse(courseId: Long) {
-        val course = courseRepository.findById(courseId)
-            ?: throw CourseNotFoundException()
-        course.validateIsOpen()
     }
 
     @Transactional
@@ -93,6 +82,71 @@ class EnrollmentTransactionService(
         )
     }
 
+    fun requireOpenCourse(courseId: Long) {
+        val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()
+        course.validateIsOpen()
+    }
+
+    private fun insert(
+        enrollmentId: Long? = null,
+        courseId: Long,
+        memberId: Long,
+        now: LocalDateTime,
+    ): EnrollmentModel = enrollmentRepository.save(
+        EnrollmentModelData(
+            enrollmentId = enrollmentId,
+            courseId = courseId,
+            memberId = memberId,
+            status = EnrollmentStatus.PENDING,
+            paymentPendingStartedAt = now,
+            paymentPendingExpiresAt = now.plus(paymentPendingExpiresIn),
+        ),
+    )
+
+    private fun reEnroll(
+        enrollment: EnrollmentModel,
+        courseId: Long,
+        memberId: Long,
+        now: LocalDateTime,
+    ): EnrollmentEnrollTransactionResult {
+        if (!courseRepository.reserveSeatIfAvailable(courseId)) {
+            return EnrollmentEnrollTransactionResult.SoldOut
+        }
+
+        val renewedEnrollment =
+            insert(
+                enrollmentId = enrollment.enrollmentId,
+                courseId = courseId,
+                memberId = memberId,
+                now = now,
+            )
+
+        return EnrollmentEnrollTransactionResult.Enrolled(
+            renewedEnrollment.toResult(),
+        )
+    }
+
+    private fun createEnrollment(
+        courseId: Long,
+        memberId: Long,
+        now: LocalDateTime,
+    ): EnrollmentEnrollTransactionResult {
+        if (!courseRepository.reserveSeatIfAvailable(courseId)) {
+            return EnrollmentEnrollTransactionResult.SoldOut
+        }
+
+        val enrollment =
+            insert(
+                courseId = courseId,
+                memberId = memberId,
+                now = now,
+            )
+
+        return EnrollmentEnrollTransactionResult.Enrolled(
+            enrollment.toResult(),
+        )
+    }
+
     private fun ownedEnrollment(
         enrollmentId: Long,
         memberId: Long,
@@ -106,4 +160,17 @@ internal fun EnrollmentModel.toResult(): EnrollmentResult = EnrollmentResult(
     courseId = courseId,
     memberId = memberId,
     status = status,
+)
+
+sealed interface EnrollmentEnrollTransactionResult {
+    data class Enrolled(
+        val enrollment: EnrollmentResult,
+    ) : EnrollmentEnrollTransactionResult
+
+    data object SoldOut : EnrollmentEnrollTransactionResult
+}
+
+data class EnrollmentCancelResult(
+    val enrollment: EnrollmentResult,
+    val courseId: Long,
 )
