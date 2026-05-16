@@ -10,6 +10,16 @@ interface EnrollmentRepository {
 
     fun findByMemberId(memberId: Long): List<EnrollmentModel>
 
+    fun findByMemberIdAndCourseId(
+        memberId: Long,
+        courseId: Long,
+    ): EnrollmentModel?
+
+    fun findAllByCourseIdsAndMemberIds(
+        courseIds: Set<Long>,
+        memberIds: Set<Long>,
+    ): List<EnrollmentModel>
+
     fun findExpiredPaymentPendingTargets(
         now: LocalDateTime,
         limit: Int,
