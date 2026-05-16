@@ -32,7 +32,6 @@ class EnrollmentServiceTest {
     private val service =
         EnrollmentService(
             enrollmentTransactionService,
-            enrollmentRepository,
             waitlistRepository,
         )
 
@@ -78,6 +77,34 @@ class EnrollmentServiceTest {
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
         assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `만료된 신청은 같은 수강 신청 row를 다시 사용한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        val expired = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.courseId,
+                memberId = 2L,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val reenrolled =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
+
+        assertThat(reenrolled.enrollmentId).isEqualTo(expired.enrollmentId)
+        assertThat(reenrolled.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(courseService.getCourse(course.courseId).seatLeftCount).isEqualTo(1)
     }
 
     @Test

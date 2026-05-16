@@ -199,6 +199,13 @@ class FakeEnrollmentRepository :
 
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.values.filter { it.memberId == memberId }
 
+    override fun findByMemberIdAndCourseId(
+        memberId: Long,
+        courseId: Long,
+    ): EnrollmentModel? = enrollments.values.firstOrNull {
+        it.memberId == memberId && it.courseId == courseId
+    }
+
     override fun findExpiredPaymentPendingTargets(
         now: LocalDateTime,
         limit: Int,
@@ -290,6 +297,7 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
         memberId: Long,
         requestedAt: Instant,
     ) {
+        entries[courseId]?.removeIf { it.memberId == memberId }
         entries.getOrPut(courseId) { mutableListOf() } += EnrollmentWaitlistEntry(
             courseId = courseId,
             memberId = memberId,
