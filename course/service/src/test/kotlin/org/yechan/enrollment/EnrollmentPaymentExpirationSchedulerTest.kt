@@ -29,7 +29,7 @@ class EnrollmentPaymentExpirationSchedulerTest {
     private val enrollmentTransactionService =
         EnrollmentTransactionService(courseRepository, enrollmentRepository)
     private val enrollmentService =
-        EnrollmentService(enrollmentTransactionService, enrollmentRepository, waitlistRepository)
+        EnrollmentService(enrollmentTransactionService, waitlistRepository)
 
     @Test
     fun `만료 스케줄러는 실제 만료 처리를 통해 좌석을 반환하고 sold out 상태를 해제한다`() {

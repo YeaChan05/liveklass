@@ -206,6 +206,13 @@ class FakeEnrollmentRepository :
         it.memberId == memberId && it.courseId == courseId
     }
 
+    override fun findAllByCourseIdsAndMemberIds(
+        courseIds: Set<Long>,
+        memberIds: Set<Long>,
+    ): List<EnrollmentModel> = enrollments.values.filter {
+        it.courseId in courseIds && it.memberId in memberIds
+    }
+
     override fun findExpiredPaymentPendingTargets(
         now: LocalDateTime,
         limit: Int,
