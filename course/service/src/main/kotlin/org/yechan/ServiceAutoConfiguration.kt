@@ -13,6 +13,8 @@ import org.yechan.enrollment.EnrollmentPaymentPendingProperties
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentTransactionService
 import org.yechan.enrollment.EnrollmentUseCase
+import org.yechan.enrollment.EnrollmentWaitlistProcessor
+import org.yechan.enrollment.EnrollmentWaitlistPromotionService
 import org.yechan.enrollment.EnrollmentWaitlistScheduler
 import org.yechan.member.MemberAuthService
 import org.yechan.member.MemberAuthUseCase
@@ -44,7 +46,14 @@ class ServiceBeanRegistrar :
             EnrollmentService(
                 bean(),
                 bean(),
+            )
+        }
+        registerBean<EnrollmentWaitlistProcessor> {
+            EnrollmentWaitlistPromotionService(
                 bean(),
+                bean(),
+                bean(),
+                bean<EnrollmentPaymentPendingProperties>().expiresIn,
             )
         }
         registerBean<EnrollmentWaitlistScheduler> {
@@ -52,8 +61,6 @@ class ServiceBeanRegistrar :
                 bean(),
                 bean(),
                 bean(),
-                bean(),
-                bean<EnrollmentPaymentPendingProperties>().expiresIn,
             )
         }
 
