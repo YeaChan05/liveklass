@@ -47,6 +47,8 @@ auth:
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
 
 enrollment:
+  waitlist:
+    ttl: ${ENROLLMENT_WAITLIST_TTL:1d}
   payment-pending:
     expires-in: ${ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN:10m}
 
