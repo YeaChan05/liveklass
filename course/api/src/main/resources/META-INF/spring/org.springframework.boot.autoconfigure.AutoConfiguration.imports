@@ -1,3 +1,4 @@
+org.yechan.CourseApiHateoasAutoConfiguration
 org.yechan.ActuatorOpenEndpointPolicy
 org.yechan.auth.JwtAutoConfiguration
 org.yechan.member.MemberAuthenticationProviderAutoConfiguration
