@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test
 import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
+import org.yechan.course.CourseCommandProcessor
 import org.yechan.course.CourseModelData
+import org.yechan.course.CourseQueryProcessor
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatus
 import org.yechan.course.CourseStatusCommand
@@ -26,25 +28,43 @@ class EnrollmentWaitlistSchedulerTest {
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val courseBulkWriter = courseRepository
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
-    private val courseService = CourseService(memberRepository, courseRepository)
+    private val courseService = CourseService(
+        CourseQueryProcessor(courseRepository),
+        CourseCommandProcessor(memberRepository, courseRepository),
+    )
     private val enrollmentTransactionService =
         EnrollmentTransactionService(courseRepository, enrollmentRepository)
-    private val enrollmentService =
-        EnrollmentService(enrollmentTransactionService, waitlistRepository)
     private val enrollmentWaitlistProcessor =
         EnrollmentWaitlistPromotionService(
             courseBulkWriter,
             enrollmentRepository,
             enrollmentRepository,
         )
-    private val scheduler = EnrollmentWaitlistScheduler(
+    private val waitlistPromotionCoordinator =
+        EnrollmentWaitlistCoordinator(
+            waitlistRepository,
+            enrollmentWaitlistProcessor,
+        )
+    private val enrollmentService =
+        EnrollmentService(enrollmentTransactionService, waitlistPromotionCoordinator)
+    private val recoveryService = WaitlistPromotionRecoveryService(
         waitlistRepository,
         courseRepository,
-        enrollmentWaitlistProcessor,
+        waitlistPromotionCoordinator,
     )
 
     @Test
-    fun `스케줄러는 좌석이 생기면 대기열의 가장 오래된 회원부터 예약한다`() {
+    fun `대기열 보정 스케줄러는 전용 서비스만 호출한다`() {
+        val recoveryService = RecordingWaitlistPromotionRecoveryUseCase()
+        val scheduler = EnrollmentWaitlistScheduler(recoveryService)
+
+        scheduler.processWaitlists()
+
+        assertThat(recoveryService.callCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `대기열 보정 서비스는 좌석이 생기면 대기열의 가장 오래된 회원부터 예약한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
@@ -54,7 +74,7 @@ class EnrollmentWaitlistSchedulerTest {
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
 
-        scheduler.processWaitlists()
+        recoveryService.recoverPromotions()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val enrollments =
@@ -82,7 +102,7 @@ class EnrollmentWaitlistSchedulerTest {
             requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
         )
 
-        scheduler.processWaitlists()
+        recoveryService.recoverPromotions()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val enrollments = enrollmentRepository.enrollments.values
@@ -122,7 +142,7 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
-        scheduler.processWaitlists()
+        recoveryService.recoverPromotions()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val promotedEnrollments =
@@ -166,19 +186,42 @@ class EnrollmentWaitlistSchedulerTest {
             enrollmentRepository,
             enrollmentRepository,
         )
-        val failingScheduler = EnrollmentWaitlistScheduler(
+        val failingRecoveryService = WaitlistPromotionRecoveryService(
             waitlistRepository,
             courseRepository,
-            failingProcessor,
+            EnrollmentWaitlistCoordinator(waitlistRepository, failingProcessor),
         )
 
-        assertThatThrownBy { failingScheduler.processWaitlists() }
+        assertThatThrownBy { failingRecoveryService.recoverPromotions() }
             .isInstanceOf(IllegalStateException::class.java)
 
         assertThat(waitlistRepository.findByMemberId(2L)).hasSize(1)
         assertThat(waitlistRepository.findByMemberId(3L)).hasSize(1)
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
         assertThat(enrollmentRepository.findByMemberId(2L)).isEmpty()
+    }
+
+    @Test
+    fun `대기열 선두 회원이 이미 좌석 점유 상태이면 제거하고 다음 대기자를 승격한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        enrollmentService.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        courseRepository.releaseSeatIfPossible(course.courseId)
+        waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
+        waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
+        waitlistRepository.markSoldOut(course.courseId)
+
+        recoveryService.recoverPromotions()
+
+        val promoted = enrollmentRepository.enrollments.values.single { it.memberId == 3L }
+
+        assertThat(promoted.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(waitlistRepository.findByMemberId(2L)).isEmpty()
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
     }
 
     @Test
@@ -197,7 +240,7 @@ class EnrollmentWaitlistSchedulerTest {
         ).enrollment
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:00Z"))
 
-        enrollmentService.cancelEnrollment(
+        enrollmentTransactionService.cancelEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
                 enrollmentId = enrollment.enrollmentId,
@@ -210,13 +253,13 @@ class EnrollmentWaitlistSchedulerTest {
             enrollmentRepository,
             Duration.ofMinutes(3),
         )
-        val customScheduler = EnrollmentWaitlistScheduler(
+        val customRecoveryService = WaitlistPromotionRecoveryService(
             waitlistRepository,
             courseRepository,
-            customProcessor,
+            EnrollmentWaitlistCoordinator(waitlistRepository, customProcessor),
         )
 
-        customScheduler.processWaitlists()
+        customRecoveryService.recoverPromotions()
 
         val promotedEnrollment = enrollmentRepository.enrollments.values.first { it.memberId == 3L }
 
@@ -245,7 +288,7 @@ class EnrollmentWaitlistSchedulerTest {
         )
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
 
-        scheduler.processWaitlists()
+        recoveryService.recoverPromotions()
 
         val reactivatedEnrollment =
             enrollmentRepository.findById(requireNotNull(expiredEnrollment.enrollmentId))
@@ -272,12 +315,21 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
-        scheduler.processWaitlists()
+        recoveryService.recoverPromotions()
 
         val changedCourse = courseRepository.findById(course.courseId!!)
 
         assertThat(changedCourse?.seatLeftCount).isEqualTo(10)
         assertThat(enrollmentRepository.findByMemberId(1L)).isEmpty()
+    }
+
+    private class RecordingWaitlistPromotionRecoveryUseCase : WaitlistPromotionRecoveryUseCase {
+        var callCount = 0
+            private set
+
+        override fun recoverPromotions() {
+            callCount++
+        }
     }
 
     private fun createCourseCommand(

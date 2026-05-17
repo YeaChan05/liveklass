@@ -6,6 +6,8 @@ import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.FakeMemberRepository
+import org.yechan.course.CourseCommandProcessor
+import org.yechan.course.CourseQueryProcessor
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -25,14 +27,36 @@ class EnrollmentPaymentExpirationSchedulerTest {
     private val courseRepository = FakeCourseRepository()
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
-    private val courseService = CourseService(memberRepository, courseRepository)
+    private val courseService = CourseService(
+        CourseQueryProcessor(courseRepository),
+        CourseCommandProcessor(memberRepository, courseRepository),
+    )
     private val enrollmentTransactionService =
         EnrollmentTransactionService(courseRepository, enrollmentRepository)
+    private val waitlistPromotionCoordinator =
+        EnrollmentWaitlistCoordinator(
+            waitlistRepository,
+            EnrollmentWaitlistPromotionService(
+                courseRepository,
+                enrollmentRepository,
+                enrollmentRepository,
+            ),
+        )
     private val enrollmentService =
-        EnrollmentService(enrollmentTransactionService, waitlistRepository)
+        EnrollmentService(enrollmentTransactionService, waitlistPromotionCoordinator)
 
     @Test
-    fun `만료 스케줄러는 실제 만료 처리를 통해 좌석을 반환하고 sold out 상태를 해제한다`() {
+    fun `결제 만료 스케줄러는 전용 서비스만 호출한다`() {
+        val expirationService = RecordingPaymentExpirationUseCase()
+        val scheduler = EnrollmentPaymentExpirationScheduler(expirationService)
+
+        scheduler.expirePaymentPendingEnrollments()
+
+        assertThat(expirationService.callCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `결제 만료 서비스는 실제 만료 처리를 통해 좌석을 반환하고 waitlist mode를 해제한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         val course = courseService.createCourse(createCourseCommand(), 1L)
@@ -55,17 +79,17 @@ class EnrollmentPaymentExpirationSchedulerTest {
 
         waitlistRepository.markSoldOut(course.courseId)
 
-        val scheduler = EnrollmentPaymentExpirationScheduler(
+        val expirationService = EnrollmentPaymentExpirationService(
             enrollmentRepository = enrollmentRepository,
             enrollmentExpirationProcessor = EnrollmentExpirationService(
                 enrollmentBulkWriter = enrollmentRepository,
                 courseBulkWriter = courseRepository,
             ),
-            waitlistRepository = waitlistRepository,
+            waitlistCoordinator = waitlistPromotionCoordinator,
             clock = clock,
         )
 
-        scheduler.expirePaymentPendingEnrollments()
+        expirationService.expirePaymentPendingEnrollments()
 
         val changedCourse = courseRepository.findById(course.courseId)
         val changedEnrollment = enrollmentRepository.findById(enrolled.enrollmentId)
@@ -76,20 +100,76 @@ class EnrollmentPaymentExpirationSchedulerTest {
     }
 
     @Test
-    fun `만료 대상이 없으면 processor를 호출하지 않는다`() {
-        val scheduler = EnrollmentPaymentExpirationScheduler(
+    fun `결제 만료로 반환된 좌석은 신규 신청자가 아니라 대기열 선두 회원에게 먼저 배정된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 4L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled = enrollmentService.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        ).enrollment
+        enrollmentRepository.enrollments[enrolled.enrollmentId] = EnrollmentModelData(
+            enrollmentId = enrolled.enrollmentId,
+            courseId = enrolled.courseId,
+            memberId = enrolled.memberId,
+            status = EnrollmentStatus.PENDING,
+            paymentPendingStartedAt = now.minusMinutes(10),
+            paymentPendingExpiresAt = now.minusMinutes(1),
+        )
+        enrollmentService.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+        enrollmentService.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
+
+        val expirationService = EnrollmentPaymentExpirationService(
             enrollmentRepository = enrollmentRepository,
             enrollmentExpirationProcessor = EnrollmentExpirationService(
                 enrollmentBulkWriter = enrollmentRepository,
                 courseBulkWriter = courseRepository,
             ),
-            waitlistRepository = waitlistRepository,
+            waitlistCoordinator = waitlistPromotionCoordinator,
             clock = clock,
         )
 
-        scheduler.expirePaymentPendingEnrollments()
+        expirationService.expirePaymentPendingEnrollments()
+
+        val promoted = enrollmentService.getMyEnrollments(3L).single()
+
+        assertThat(enrollmentRepository.findById(enrolled.enrollmentId)?.status).isEqualTo(EnrollmentStatus.EXPIRED)
+        assertThat(promoted.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(courseRepository.findById(course.courseId)?.seatLeftCount).isEqualTo(0)
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+    }
+
+    @Test
+    fun `만료 대상이 없으면 processor를 호출하지 않는다`() {
+        val expirationService = EnrollmentPaymentExpirationService(
+            enrollmentRepository = enrollmentRepository,
+            enrollmentExpirationProcessor = EnrollmentExpirationService(
+                enrollmentBulkWriter = enrollmentRepository,
+                courseBulkWriter = courseRepository,
+            ),
+            waitlistCoordinator = waitlistPromotionCoordinator,
+            clock = clock,
+        )
+
+        expirationService.expirePaymentPendingEnrollments()
 
         assertThat(waitlistRepository.findCourseIds()).isEmpty()
+    }
+
+    private class RecordingPaymentExpirationUseCase : EnrollmentPaymentExpirationUseCase {
+        var callCount = 0
+            private set
+
+        override fun expirePaymentPendingEnrollments() {
+            callCount++
+        }
     }
 
     private fun createCourseCommand(

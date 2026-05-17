@@ -11,9 +11,48 @@ import org.yechan.member.MemberRole
 import java.time.LocalDateTime
 
 class CourseServiceTest {
+
+    @Test
+    fun `조회 요청은 조회 처리기에 맡긴다`() {
+        // Arrange
+        val queryProcessor = RecordingCourseQueryHandler()
+        val service = CourseService(queryProcessor, RecordingCourseCommandHandler())
+
+        // Act
+        val course = service.getCourse(10L)
+        val courses = service.getCourses(CourseStatus.OPEN)
+
+        // Assert
+        assertThat(course.courseId).isEqualTo(10L)
+        assertThat(courses).hasSize(1)
+        assertThat(queryProcessor.requestedCourseIds).containsExactly(10L)
+        assertThat(queryProcessor.requestedStatuses).containsExactly(CourseStatus.OPEN)
+    }
+
+    @Test
+    fun `변경 요청은 명령 처리기에 맡긴다`() {
+        // Arrange
+        val commandProcessor = RecordingCourseCommandHandler()
+        val service = CourseService(RecordingCourseQueryHandler(), commandProcessor)
+        val createCommand = createCourseCommand()
+        val statusCommand = CourseStatusCommand(memberId = 1L, courseId = 10L)
+
+        // Act
+        service.createCourse(createCommand, 1L)
+        service.openCourse(statusCommand)
+        service.closeCourse(statusCommand)
+
+        // Assert
+        assertThat(commandProcessor.createdCommands).containsExactly(createCommand to 1L)
+        assertThat(commandProcessor.openedCommands).containsExactly(statusCommand)
+        assertThat(commandProcessor.closedCommands).containsExactly(statusCommand)
+    }
     private val memberRepository = FakeMemberRepository()
     private val courseRepository = FakeCourseRepository()
-    private val service = CourseService(memberRepository, courseRepository)
+    private val service = CourseService(
+        CourseQueryProcessor(courseRepository),
+        CourseCommandProcessor(memberRepository, courseRepository),
+    )
 
     @Test
     fun `CREATOR는 강의를 등록하고 모집을 시작하고 마감한다`() {
@@ -308,4 +347,62 @@ class CourseServiceTest {
         name = "user$id",
         role = role,
     )
+
+    private class RecordingCourseQueryHandler : CourseQueryHandler {
+        val requestedCourseIds = mutableListOf<Long>()
+        val requestedStatuses = mutableListOf<CourseStatus?>()
+
+        override fun getCourse(courseId: Long): CourseResult {
+            requestedCourseIds += courseId
+            return courseResult(courseId = courseId)
+        }
+
+        override fun getCourses(status: CourseStatus?): List<CourseResult> {
+            requestedStatuses += status
+            return listOf(courseResult(status = status ?: CourseStatus.DRAFT))
+        }
+    }
+
+    private class RecordingCourseCommandHandler : CourseCommandHandler {
+        val createdCommands = mutableListOf<Pair<CreateCourseCommand, Long>>()
+        val openedCommands = mutableListOf<CourseStatusCommand>()
+        val closedCommands = mutableListOf<CourseStatusCommand>()
+
+        override fun createCourse(
+            command: CreateCourseCommand,
+            creatorId: Long,
+        ): CourseResult {
+            createdCommands += command to creatorId
+            return courseResult(creatorId = creatorId)
+        }
+
+        override fun openCourse(command: CourseStatusCommand): CourseResult {
+            openedCommands += command
+            return courseResult(courseId = command.courseId, creatorId = command.memberId, status = CourseStatus.OPEN)
+        }
+
+        override fun closeCourse(command: CourseStatusCommand): CourseResult {
+            closedCommands += command
+            return courseResult(courseId = command.courseId, creatorId = command.memberId, status = CourseStatus.CLOSED)
+        }
+    }
+
+    private companion object {
+        fun courseResult(
+            courseId: Long = 1L,
+            creatorId: Long = 1L,
+            status: CourseStatus = CourseStatus.DRAFT,
+        ): CourseResult = CourseResult(
+            courseId = courseId,
+            creatorId = creatorId,
+            title = "Kotlin Basic",
+            description = "Kotlin course",
+            price = Money(1L),
+            capacity = 2,
+            seatLeftCount = 2,
+            periodStart = LocalDateTime.of(2026, 6, 1, 0, 0),
+            periodEnd = LocalDateTime.of(2026, 6, 30, 0, 0),
+            status = status,
+        )
+    }
 }

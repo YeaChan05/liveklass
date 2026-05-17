@@ -7,8 +7,10 @@ import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.FakeMemberRepository
+import org.yechan.course.CourseCommandProcessor
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
+import org.yechan.course.CourseQueryProcessor
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -26,13 +28,25 @@ class EnrollmentServiceTest {
     private val courseRepository = FakeCourseRepository()
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
-    private val courseService = CourseService(memberRepository, courseRepository)
+    private val courseService = CourseService(
+        CourseQueryProcessor(courseRepository),
+        CourseCommandProcessor(memberRepository, courseRepository),
+    )
     private val enrollmentTransactionService =
         EnrollmentTransactionService(courseRepository, enrollmentRepository)
+    private val waitlistPromotionCoordinator =
+        EnrollmentWaitlistCoordinator(
+            waitlistRepository,
+            EnrollmentWaitlistPromotionService(
+                courseRepository,
+                enrollmentRepository,
+                enrollmentRepository,
+            ),
+        )
     private val service =
         EnrollmentService(
             enrollmentTransactionService,
-            waitlistRepository,
+            waitlistPromotionCoordinator,
         )
 
     @Test
@@ -503,6 +517,76 @@ class EnrollmentServiceTest {
         )
 
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `수강 취소로 좌석이 반환되면 신규 신청자보다 대기열 선두 회원이 먼저 승격된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 4L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled = service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrolled.enrollmentId,
+            ),
+        )
+
+        val promoted = service.getMyEnrollments(3L).single()
+        val changedCourse = courseService.getCourse(course.courseId)
+
+        assertThat(promoted.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(0)
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+    }
+
+    @Test
+    fun `수강 취소 승격 후 대기열이 비면 매진 표시를 해제한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled = service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrolled.enrollmentId,
+            ),
+        )
+
+        assertThat(service.getMyEnrollments(3L).single().status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `이미 대기 중인 회원이 다시 신청해도 순번이 변경되지 않는다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 4L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
+
+        val rankBefore = waitlistRepository.rank(course.courseId, 3L)
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+
+        assertThat(waitlistRepository.rank(course.courseId, 3L)).isEqualTo(rankBefore)
+        assertThat(waitlistRepository.rank(course.courseId, 4L)).isEqualTo(2)
     }
 
     @Test

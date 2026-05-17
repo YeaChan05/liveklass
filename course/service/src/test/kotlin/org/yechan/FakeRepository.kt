@@ -309,7 +309,10 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
         memberId: Long,
         requestedAt: Instant,
     ) {
-        entries[courseId]?.removeIf { it.memberId == memberId }
+        if (entries[courseId]?.any { it.memberId == memberId } == true) {
+            return
+        }
+
         entries.getOrPut(courseId) { mutableListOf() } += EnrollmentWaitlistEntry(
             courseId = courseId,
             memberId = memberId,
@@ -330,6 +333,19 @@ class FakeEnrollmentWaitlistRepository : EnrollmentWaitlistRepository {
 
         return first
     }
+
+    override fun peek(courseId: Long): EnrollmentWaitlistEntry? = entries[courseId]?.firstOrNull()
+
+    override fun count(courseId: Long): Long = entries[courseId]?.size?.toLong() ?: 0L
+
+    override fun rank(
+        courseId: Long,
+        memberId: Long,
+    ): Long? = entries[courseId]
+        ?.indexOfFirst { it.memberId == memberId }
+        ?.takeIf { it >= 0 }
+        ?.plus(1)
+        ?.toLong()
 
     override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = entries.values
         .flatten()

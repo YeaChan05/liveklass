@@ -18,6 +18,75 @@ import java.time.LocalDateTime
 import java.util.Collections
 
 class MemberAuthServiceTest {
+
+    @Test
+    fun `회원가입 요청은 가입 처리기에 맡긴다`() {
+        // Arrange
+        val registrationHandler = RecordingMemberRegistrationHandler()
+        val service = MemberAuthService(
+            registrationHandler,
+            RecordingMemberSessionHandler(),
+            RecordingMemberCurrentMemberHandler(),
+        )
+        val command = SignupCommand(
+            "student@example.com",
+            "password1234!",
+            "홍길동",
+            MemberRole.CLASSMATE,
+        )
+
+        // Act
+        val result = service.signup(command)
+
+        // Assert
+        assertThat(result.email).isEqualTo(command.email)
+        assertThat(registrationHandler.signupCommands).containsExactly(command)
+    }
+
+    @Test
+    fun `세션 요청은 세션 처리기에 맡긴다`() {
+        // Arrange
+        val sessionHandler = RecordingMemberSessionHandler()
+        val service = MemberAuthService(
+            RecordingMemberRegistrationHandler(),
+            sessionHandler,
+            RecordingMemberCurrentMemberHandler(),
+        )
+        val loginCommand = LoginCommand("student@example.com", "password1234!")
+        val refreshCommand = RefreshTokenCommand("refresh-token")
+        val logoutCommand = LogoutCommand(1L, "access-token")
+
+        // Act
+        service.login(loginCommand)
+        service.refresh(refreshCommand)
+        service.logout(logoutCommand)
+
+        // Assert
+        assertThat(sessionHandler.loginCommands).containsExactly(loginCommand)
+        assertThat(sessionHandler.refreshCommands).containsExactly(refreshCommand)
+        assertThat(sessionHandler.logoutCommands).containsExactly(logoutCommand)
+    }
+
+    @Test
+    fun `현재 회원 조회 요청은 조회 처리기에 맡긴다`() {
+        // Arrange
+        val currentMemberHandler = RecordingMemberCurrentMemberHandler()
+        val service = MemberAuthService(
+            RecordingMemberRegistrationHandler(),
+            RecordingMemberSessionHandler(),
+            currentMemberHandler,
+        )
+
+        // Act
+        val byId = service.getCurrentUser(1L)
+        val byEmail = service.getCurrentUserByEmail("student@example.com")
+
+        // Assert
+        assertThat(byId.id).isEqualTo(1L)
+        assertThat(byEmail.email).isEqualTo("student@example.com")
+        assertThat(currentMemberHandler.requestedUserIds).containsExactly(1L)
+        assertThat(currentMemberHandler.requestedEmails).containsExactly("student@example.com")
+    }
     private val members = FakeMemberRepository()
     private val refreshTokens = FakeRefreshTokenRepository()
     private val passwordHashEncoder = FakePasswordHashEncoder()
@@ -28,14 +97,21 @@ class MemberAuthServiceTest {
     private val authTokenProperties = AuthTokenProperties("test-salt", 1800, 604800)
     private val service =
         MemberAuthService(
-            members,
-            refreshTokens,
-            passwordHashEncoder,
-            tokenGenerator,
-            tokenVerifier,
-            tokenExpirationResolver,
-            accessTokenBlacklistRepository,
-            authTokenProperties,
+            MemberRegistrationProcessor(
+                members,
+                passwordHashEncoder,
+            ),
+            MemberSessionProcessor(
+                members,
+                refreshTokens,
+                passwordHashEncoder,
+                tokenGenerator,
+                tokenVerifier,
+                tokenExpirationResolver,
+                accessTokenBlacklistRepository,
+                authTokenProperties,
+            ),
+            MemberCurrentMemberProcessor(members),
         )
 
     @Test
@@ -451,5 +527,87 @@ class MemberAuthServiceTest {
         override fun contains(token: String): Boolean = tokens.containsKey(token)
 
         fun ttlOf(token: String): Duration? = tokens[token]
+    }
+
+    private class RecordingMemberRegistrationHandler : MemberRegistrationHandler {
+        val signupCommands = mutableListOf<SignupCommand>()
+
+        override fun signup(command: SignupCommand): SignupResult {
+            signupCommands += command
+            return SignupResult(
+                userId = 1L,
+                email = command.email,
+                name = command.name,
+                role = command.role,
+            )
+        }
+    }
+
+    private class RecordingMemberSessionHandler : MemberSessionHandler {
+        val loginCommands = mutableListOf<LoginCommand>()
+        val refreshCommands = mutableListOf<RefreshTokenCommand>()
+        val logoutCommands = mutableListOf<LogoutCommand>()
+
+        override fun login(command: LoginCommand): LoginResult {
+            loginCommands += command
+            return LoginResult(
+                accessToken = "access-token",
+                refreshToken = "refresh-token",
+                tokenType = "Bearer",
+                expiresIn = 1800,
+                user = memberSummary(email = command.email),
+            )
+        }
+
+        override fun refresh(command: RefreshTokenCommand): RefreshTokenResult {
+            refreshCommands += command
+            return RefreshTokenResult(
+                accessToken = "access-token",
+                tokenType = "Bearer",
+                expiresIn = 1800,
+            )
+        }
+
+        override fun logout(command: LogoutCommand) {
+            logoutCommands += command
+        }
+    }
+
+    private class RecordingMemberCurrentMemberHandler : MemberCurrentMemberHandler {
+        val requestedUserIds = mutableListOf<Long>()
+        val requestedEmails = mutableListOf<String>()
+
+        override fun getCurrentUser(userId: Long): CurrentMemberResult {
+            requestedUserIds += userId
+            return currentMemberResult(id = userId)
+        }
+
+        override fun getCurrentUserByEmail(email: String): CurrentMemberResult {
+            requestedEmails += email
+            return currentMemberResult(email = email)
+        }
+    }
+
+    private companion object {
+        fun memberSummary(
+            id: Long = 1L,
+            email: String = "student@example.com",
+        ): MemberSummary = MemberSummary(
+            id = id,
+            email = email,
+            name = "홍길동",
+            role = MemberRole.CLASSMATE,
+        )
+
+        fun currentMemberResult(
+            id: Long = 1L,
+            email: String = "student@example.com",
+        ): CurrentMemberResult = CurrentMemberResult(
+            id = id,
+            email = email,
+            name = "홍길동",
+            role = MemberRole.CLASSMATE,
+            status = MemberStatus.ACTIVE,
+        )
     }
 }
