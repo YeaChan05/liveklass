@@ -24,11 +24,11 @@ class EnrollmentService(
         val memberId = command.memberId
         val courseId = command.courseId
 
-        enrollmentTransactionService.findPendingOrConfirmedEnrollment(command)?.let {
-            return EnrollResult.Enrolled(it)
-        }
-
         if (waitlistRepository.isSoldOut(courseId)) {
+            enrollmentTransactionService.findPendingOrConfirmedEnrollment(command)?.let {
+                return EnrollResult.Enrolled(it)
+            }
+
             enqueueWaitlist(courseId, memberId)
             return EnrollResult.Waitlisted(
                 courseId = courseId,
