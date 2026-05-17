@@ -201,13 +201,13 @@ class EnrollmentControllerTest @Autowired constructor(
 }
 
 class FakeEnrollmentUseCase : EnrollmentUseCase {
-    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult = if (command.courseId == 999L) {
-        EnrollmentEnrollResult.Waitlisted(
+    override fun enroll(command: EnrollCourseCommand): EnrollResult = if (command.courseId == 999L) {
+        EnrollResult.Waitlisted(
             courseId = command.courseId,
             memberId = command.memberId,
         )
     } else {
-        EnrollmentEnrollResult.Enrolled(
+        EnrollResult.Enrolled(
             enrollment(
                 memberId = command.memberId,
                 status = EnrollmentStatus.PENDING,
@@ -215,12 +215,12 @@ class FakeEnrollmentUseCase : EnrollmentUseCase {
         )
     }
 
-    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
+    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo = enrollment(
         memberId = command.memberId,
         status = EnrollmentStatus.CONFIRMED,
     )
 
-    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollment(
+    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo = enrollment(
         memberId = command.memberId,
         status = EnrollmentStatus.CANCELLED,
     )
@@ -229,16 +229,16 @@ class FakeEnrollmentUseCase : EnrollmentUseCase {
         Unit
     }
 
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = listOf(
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = listOf(
         enrollment(
             memberId = memberId,
             status = EnrollmentStatus.CANCELLED,
         ),
     )
 
-    override fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult> = if (memberId == 2L) {
+    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = if (memberId == 2L) {
         listOf(
-            EnrollmentWaitlistResult(
+            WaitlistInfo(
                 courseId = 999L,
                 memberId = memberId,
                 requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
@@ -251,7 +251,7 @@ class FakeEnrollmentUseCase : EnrollmentUseCase {
     private fun enrollment(
         memberId: Long,
         status: EnrollmentStatus,
-    ) = EnrollmentResult(
+    ) = EnrollmentInfo(
         enrollmentId = 1L,
         courseId = 1L,
         memberId = memberId,

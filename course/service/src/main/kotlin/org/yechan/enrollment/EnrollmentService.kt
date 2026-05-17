@@ -3,48 +3,48 @@ package org.yechan.enrollment
 import java.time.Instant
 
 interface EnrollmentUseCase {
-    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult
+    fun enroll(command: EnrollCourseCommand): EnrollResult
 
-    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
+    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo
 
-    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult
+    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo
 
     fun cancelWaitlist(command: EnrollmentWaitlistCommand)
 
-    fun getMyEnrollments(memberId: Long): List<EnrollmentResult>
+    fun getMyEnrollments(memberId: Long): List<EnrollmentInfo>
 
-    fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult>
+    fun getMyWaitlist(memberId: Long): List<WaitlistInfo>
 }
 
 class EnrollmentService(
     private val enrollmentTransactionService: EnrollmentTransactionService,
     private val waitlistRepository: EnrollmentWaitlistRepository,
 ) : EnrollmentUseCase {
-    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollResult {
+    override fun enroll(command: EnrollCourseCommand): EnrollResult {
         val memberId = command.memberId
         val courseId = command.courseId
 
         enrollmentTransactionService.findPendingOrConfirmedEnrollment(command)?.let {
-            return EnrollmentEnrollResult.Enrolled(it)
+            return EnrollResult.Enrolled(it)
         }
 
         if (waitlistRepository.isSoldOut(courseId)) {
             enqueueWaitlist(courseId, memberId)
-            return EnrollmentEnrollResult.Waitlisted(
+            return EnrollResult.Waitlisted(
                 courseId = courseId,
                 memberId = memberId,
             )
         }
 
         return when (val result = enrollmentTransactionService.enroll(command)) {
-            is EnrollmentEnrollTransactionResult.Enrolled -> EnrollmentEnrollResult.Enrolled(result.enrollment)
+            is EnrollmentEnrollTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
             EnrollmentEnrollTransactionResult.SoldOut -> rejectSoldOut(courseId, memberId)
         }
     }
 
-    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult = enrollmentTransactionService.confirmEnrollment(command)
+    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo = enrollmentTransactionService.confirmEnrollment(command)
 
-    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentResult {
+    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
         val result = enrollmentTransactionService.cancelEnrollment(command)
         waitlistRepository.clearSoldOut(result.courseId)
         return result.enrollment
@@ -54,11 +54,11 @@ class EnrollmentService(
         waitlistRepository.remove(command.courseId, command.memberId)
     }
 
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentTransactionService.getMyEnrollments(memberId)
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentTransactionService.getMyEnrollments(memberId)
 
-    override fun getMyWaitlist(memberId: Long): List<EnrollmentWaitlistResult> = waitlistRepository.findByMemberId(memberId)
+    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = waitlistRepository.findByMemberId(memberId)
         .map {
-            EnrollmentWaitlistResult(
+            WaitlistInfo(
                 courseId = it.courseId,
                 memberId = it.memberId,
                 requestedAt = it.requestedAt,
@@ -79,7 +79,7 @@ class EnrollmentService(
     private fun rejectSoldOut(
         courseId: Long,
         memberId: Long,
-    ): EnrollmentEnrollResult.Waitlisted {
+    ): EnrollResult.Waitlisted {
         waitlistRepository.markSoldOut(courseId)
         try {
             enrollmentTransactionService.requireOpenCourse(courseId)
@@ -89,32 +89,32 @@ class EnrollmentService(
         }
 
         enqueueWaitlist(courseId, memberId)
-        return EnrollmentEnrollResult.Waitlisted(
+        return EnrollResult.Waitlisted(
             courseId = courseId,
             memberId = memberId,
         )
     }
 }
 
-sealed interface EnrollmentEnrollResult {
+sealed interface EnrollResult {
     data class Enrolled(
-        val enrollment: EnrollmentResult,
-    ) : EnrollmentEnrollResult
+        val enrollment: EnrollmentInfo,
+    ) : EnrollResult
 
     data class Waitlisted(
         val courseId: Long,
         val memberId: Long,
-    ) : EnrollmentEnrollResult
+    ) : EnrollResult
 }
 
-data class EnrollmentWaitlistResult(
+data class WaitlistInfo(
     val courseId: Long,
     val memberId: Long,
     val requestedAt: Instant,
 )
 
-val EnrollmentEnrollResult.enrollment: EnrollmentResult
+val EnrollResult.enrollment: EnrollmentInfo
     get() = when (this) {
-        is EnrollmentEnrollResult.Enrolled -> enrollment
-        is EnrollmentEnrollResult.Waitlisted -> error("대기열 등록 결과에는 수강 신청 정보가 없습니다.")
+        is EnrollResult.Enrolled -> enrollment
+        is EnrollResult.Waitlisted -> error("대기열 등록 결과에는 수강 신청 정보가 없습니다.")
     }

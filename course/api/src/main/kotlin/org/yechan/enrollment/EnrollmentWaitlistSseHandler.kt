@@ -11,7 +11,7 @@ class EnrollmentWaitlistSseHandler(
 ) {
     fun getMyWaitlist(userId: Long): SseEmitter {
         val emitter = SseEmitter()
-        val waitlist = enrollmentUseCase.getMyWaitlist(userId).map(EnrollmentWaitlistResult::toResponse)
+        val waitlist = enrollmentUseCase.getMyWaitlist(userId).map(WaitlistInfo::toResponse)
 
         try {
             emitter.send(
@@ -28,7 +28,7 @@ class EnrollmentWaitlistSseHandler(
     }
 }
 
-private fun EnrollmentWaitlistResult.toResponse(): EnrollmentWaitlistResponse = EnrollmentWaitlistResponse(
+private fun WaitlistInfo.toResponse(): EnrollmentWaitlistResponse = EnrollmentWaitlistResponse(
     courseId = courseId,
     memberId = memberId,
     requestedAt = requestedAt,

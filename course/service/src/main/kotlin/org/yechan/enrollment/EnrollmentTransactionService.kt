@@ -14,13 +14,13 @@ class EnrollmentTransactionService(
     private val enrollmentRepository: EnrollmentRepository,
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) {
-    fun findPendingOrConfirmedEnrollment(command: EnrollCourseCommand): EnrollmentResult? = enrollmentRepository.findByMemberIdAndCourseId(
+    fun findPendingOrConfirmedEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
         memberId = command.memberId,
         courseId = command.courseId,
     )?.takeIf(EnrollmentModel::isPendingOrConfirmed)
         ?.toResult()
 
-    fun getMyEnrollments(memberId: Long): List<EnrollmentResult> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+    fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
 
     @Transactional
     fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
@@ -61,7 +61,7 @@ class EnrollmentTransactionService(
     }
 
     @Transactional
-    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentResult {
+    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
         val confirmed = enrollment.confirm()
         return enrollmentRepository.save(confirmed).toResult()
@@ -155,7 +155,7 @@ class EnrollmentTransactionService(
         ?: throw EnrollmentNotFoundException()
 }
 
-internal fun EnrollmentModel.toResult(): EnrollmentResult = EnrollmentResult(
+internal fun EnrollmentModel.toResult(): EnrollmentInfo = EnrollmentInfo(
     enrollmentId = requireNotNull(enrollmentId),
     courseId = courseId,
     memberId = memberId,
@@ -164,13 +164,13 @@ internal fun EnrollmentModel.toResult(): EnrollmentResult = EnrollmentResult(
 
 sealed interface EnrollmentEnrollTransactionResult {
     data class Enrolled(
-        val enrollment: EnrollmentResult,
+        val enrollment: EnrollmentInfo,
     ) : EnrollmentEnrollTransactionResult
 
     data object SoldOut : EnrollmentEnrollTransactionResult
 }
 
 data class EnrollmentCancelResult(
-    val enrollment: EnrollmentResult,
+    val enrollment: EnrollmentInfo,
     val courseId: Long,
 )

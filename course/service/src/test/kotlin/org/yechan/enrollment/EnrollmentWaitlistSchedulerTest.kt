@@ -129,13 +129,13 @@ class EnrollmentWaitlistSchedulerTest {
             enrollmentRepository.enrollments.values.filter { it.memberId == 3L }
 
         assertThat(firstWaitlisted).isEqualTo(
-            EnrollmentEnrollResult.Waitlisted(
+            EnrollResult.Waitlisted(
                 courseId = course.courseId,
                 memberId = 3L,
             ),
         )
         assertThat(secondWaitlisted).isEqualTo(
-            EnrollmentEnrollResult.Waitlisted(
+            EnrollResult.Waitlisted(
                 courseId = course.courseId,
                 memberId = 4L,
             ),

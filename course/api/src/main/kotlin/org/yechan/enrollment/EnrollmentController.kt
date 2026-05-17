@@ -47,7 +47,7 @@ class EnrollmentController(
     @GetMapping("/enrollments/me")
     fun getMyEnrollments(
         @LoginUserId userId: Long,
-    ): List<EnrollmentResponse> = enrollmentUseCase.getMyEnrollments(userId).map(EnrollmentResult::toResponse)
+    ): List<EnrollmentResponse> = enrollmentUseCase.getMyEnrollments(userId).map(EnrollmentInfo::toResponse)
 
     @GetMapping("/enrollments/waitlist/me", produces = ["text/event-stream"])
     fun getMyWaitlist(
@@ -55,17 +55,17 @@ class EnrollmentController(
     ) = enrollmentWaitlistSseHandler.getMyWaitlist(userId)
 }
 
-private fun EnrollmentResult.toResponse(): EnrollmentResponse = EnrollmentResponse(
+private fun EnrollmentInfo.toResponse(): EnrollmentResponse = EnrollmentResponse(
     enrollmentId = enrollmentId,
     courseId = courseId,
     memberId = memberId,
     status = status.toResponseStatus(),
 )
 
-private fun EnrollmentEnrollResult.toResponse(): EnrollmentResponse = when (this) {
-    is EnrollmentEnrollResult.Enrolled -> enrollment.toResponse()
+private fun EnrollResult.toResponse(): EnrollmentResponse = when (this) {
+    is EnrollResult.Enrolled -> enrollment.toResponse()
 
-    is EnrollmentEnrollResult.Waitlisted -> EnrollmentResponse(
+    is EnrollResult.Waitlisted -> EnrollmentResponse(
         enrollmentId = null,
         courseId = courseId,
         memberId = memberId,

@@ -68,7 +68,7 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
 
         assertThat(waitlisted).isEqualTo(
-            EnrollmentEnrollResult.Waitlisted(
+            EnrollResult.Waitlisted(
                 courseId = course.courseId,
                 memberId = 3L,
             ),
@@ -470,7 +470,7 @@ class EnrollmentServiceTest {
             )
 
         assertThat(waitlisted).isEqualTo(
-            EnrollmentEnrollResult.Waitlisted(
+            EnrollResult.Waitlisted(
                 courseId = course.courseId,
                 memberId = 3L,
             ),
@@ -506,7 +506,7 @@ class EnrollmentServiceTest {
             )
 
         assertThat(waitlisted).isEqualTo(
-            EnrollmentEnrollResult.Waitlisted(
+            EnrollResult.Waitlisted(
                 courseId = course.courseId,
                 memberId = 2L,
             ),
