@@ -5,8 +5,13 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
 import java.time.LocalDateTime
 
+data class EnrollmentWaitlistPromotionCandidate(
+    val waitlist: EnrollmentWaitlistEntry,
+    val promotedAt: LocalDateTime,
+)
+
 interface EnrollmentWaitlistProcessor {
-    fun promote(candidates: List<EnrollmentWaitlistPromotionCandidate>)
+    fun promote(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistPromotionResult
 }
 
 open class EnrollmentWaitlistPromotionService(
@@ -16,28 +21,23 @@ open class EnrollmentWaitlistPromotionService(
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) : EnrollmentWaitlistProcessor {
     @Transactional
-    override fun promote(candidates: List<EnrollmentWaitlistPromotionCandidate>) {
+    override fun promote(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistPromotionResult {
+        val waitlist = candidate.waitlist
         val enrollmentsByCourseAndMember = enrollmentRepository.findAllByCourseIdsAndMemberIds(
-            courseIds = candidates.map { it.waitlist.courseId }.toSet(),
-            memberIds = candidates.map { it.waitlist.memberId }.toSet(),
+            courseIds = setOf(waitlist.courseId),
+            memberIds = setOf(waitlist.memberId),
         ).associateBy { it.courseId to it.memberId }
 
-        val promotions = candidates.mapNotNull {
-            val waitlist = it.waitlist
-            waitlist.toPromotableEnrollment(
-                courseId = waitlist.courseId,
-                now = it.promotedAt,
-                existingEnrollment = enrollmentsByCourseAndMember[waitlist.courseId to waitlist.memberId],
-            )
-        }
-            .ifEmpty { return }
+        val promotion = waitlist.toPromotableEnrollment(
+            courseId = waitlist.courseId,
+            now = candidate.promotedAt,
+            existingEnrollment = enrollmentsByCourseAndMember[waitlist.courseId to waitlist.memberId],
+        ) ?: return EnrollmentWaitlistPromotionResult.Invalid
 
-        val reservedCountsByCourseId = promotions
-            .groupingBy { it.courseId }
-            .eachCount()
+        courseBulkWriter.reserveSeatsBulk(mapOf(promotion.courseId to 1))
+        enrollmentBulkWriter.saveAllBulk(listOf(promotion))
 
-        courseBulkWriter.reserveSeatsBulk(reservedCountsByCourseId)
-        enrollmentBulkWriter.saveAllBulk(promotions)
+        return EnrollmentWaitlistPromotionResult.Promoted
     }
 
     private fun EnrollmentWaitlistEntry.toPromotableEnrollment(
@@ -64,6 +64,11 @@ open class EnrollmentWaitlistPromotionService(
             paymentPendingExpiresIn = paymentPendingExpiresIn,
         )
     }
+}
+
+enum class EnrollmentWaitlistPromotionResult {
+    Promoted,
+    Invalid,
 }
 
 private fun EnrollmentWaitlistEntry.getEnrollment(
