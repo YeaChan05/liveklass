@@ -17,7 +17,7 @@ class EnrollmentTransactionService(
     fun findPendingOrConfirmedEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
         memberId = command.memberId,
         courseId = command.courseId,
-    )?.takeIf(EnrollmentModel::isPendingOrConfirmed)
+    )?.takeIf(EnrollmentModel::isSeatOccupied)
         ?.toResult()
 
     fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }

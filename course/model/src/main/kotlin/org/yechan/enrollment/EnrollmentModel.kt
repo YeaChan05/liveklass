@@ -68,9 +68,6 @@ interface EnrollmentModel :
 
     fun isSeatOccupied(): Boolean = status == EnrollmentStatus.PENDING ||
         status == EnrollmentStatus.CONFIRMED
-
-    fun isPendingOrConfirmed(): Boolean = status == EnrollmentStatus.PENDING ||
-        status == EnrollmentStatus.CONFIRMED
 }
 
 data class EnrollmentModelData(
