@@ -60,6 +60,9 @@ class EnrollmentControllerTest @Autowired constructor(
             .expectBody()
             .jsonPath("$.enrollmentId").isEqualTo(1)
             .jsonPath("$.status").isEqualTo("PENDING")
+            .jsonPath("$._links.course.href").exists()
+            .jsonPath("$._links.confirm.href").exists()
+            .jsonPath("$._links.cancel.href").exists()
 
         restTestClient.post()
             .uri("/api/enrollments/1/confirm")
@@ -106,6 +109,8 @@ class EnrollmentControllerTest @Autowired constructor(
                 assertThat(body).contains("\"enrollmentId\":null")
                 assertThat(body).contains("\"memberId\":2")
                 assertThat(body).contains("\"status\":\"WAITLISTED\"")
+                assertThat(body).contains("\"waitlist-events\"")
+                assertThat(body).contains("\"cancel-waitlist\"")
             }
     }
 
@@ -156,6 +161,8 @@ class EnrollmentControllerTest @Autowired constructor(
             .expectBody()
             .jsonPath("$.memberId").isEqualTo(1)
             .jsonPath("$.status").isEqualTo("PENDING")
+            .jsonPath("$._links.confirm.href").exists()
+            .jsonPath("$._links.cancel.href").exists()
     }
 
     @Test

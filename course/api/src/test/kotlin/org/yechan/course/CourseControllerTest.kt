@@ -79,6 +79,9 @@ class CourseControllerTest @Autowired constructor(
             .jsonPath("$.seatLeftCount").isEqualTo(2)
             .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
             .jsonPath("$.status").isEqualTo("OPEN")
+            .jsonPath("$._links.self.href").exists()
+            .jsonPath("$._links.close.href").exists()
+            .jsonPath("$._links.enroll.href").exists()
 
         restTestClient.post()
             .uri("/api/courses/1/close")
@@ -93,6 +96,8 @@ class CourseControllerTest @Autowired constructor(
             .jsonPath("$.seatLeftCount").isEqualTo(2)
             .jsonPath("$.currentEnrollmentCount").isEqualTo(0)
             .jsonPath("$.status").isEqualTo("CLOSED")
+            .jsonPath("$._links.self.href").exists()
+            .jsonPath("$._links.courses.href").exists()
 
         restTestClient.get()
             .uri("/api/courses")
