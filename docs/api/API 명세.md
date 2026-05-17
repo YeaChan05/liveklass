@@ -17,6 +17,25 @@
 -H "Authorization: Bearer {accessToken}"
 ```
 
+
+---
+
+## Swagger / OpenAPI
+
+- Swagger UI: `GET /swagger-ui.html` 또는 `GET /swagger-ui/index.html`
+- OpenAPI JSON: `GET /v3/api-docs`
+- OpenAPI YAML: `GET /v3/api-docs.yaml`
+- 위 문서 endpoint는 API 탐색용 공개 endpoint이므로 인증 토큰 없이 접근할 수 있습니다.
+- 실제 업무 API의 인증 정책은 변경하지 않으며, 공개되지 않은 경로는 기존처럼 공통 보안 fallback에 의해 인증이 필요합니다.
+
+```bash
+curl -X GET "http://localhost:8080/v3/api-docs"
+```
+
+```bash
+curl -X GET "http://localhost:8080/swagger-ui.html"
+```
+
 ---
 
 ## 인증 API

@@ -106,3 +106,19 @@ class {Domain}ApplicationSecurityBeanRegistrar :
 - 공통 인증 체인은 유지하면서 공개 경로만 모듈별로 다르게 가져가야 하는 프로젝트
 - Swagger/health/auth endpoint 예외가 자주 바뀌는 프로젝트
 - 보안 정책을 중앙 집중식 하드코딩보다 모듈 기여 방식으로 관리하고 싶은 프로젝트
+
+#### 8. Swagger/OpenAPI 공개 정책
+
+Swagger/OpenAPI endpoint는 API 문서 탐색을 위한 공개 endpoint로 다룬다.
+다만 공통 `SecurityFilterChain`을 직접 수정하지 않고, 별도 `AuthorizeHttpRequestsCustomizer` 기여로만 허용한다.
+
+허용 범위는 다음처럼 최소 경로로 제한한다.
+
+- `GET /v3/api-docs`
+- `GET /v3/api-docs/**`
+- `GET /v3/api-docs.yaml`
+- `GET /swagger-ui.html`
+- `GET /swagger-ui/**`
+
+이 정책은 공통 fallback인 `anyRequest().authenticated()`보다 먼저 적용되어야 한다.
+Swagger 경로 외의 일반 endpoint가 함께 열리지 않는지 테스트로 확인한다.

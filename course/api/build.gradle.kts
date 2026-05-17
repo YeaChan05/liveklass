@@ -7,5 +7,6 @@ dependencies {
     implementation(rootProject.libs.jjwt.api)
     implementation(rootProject.libs.jjwt.impl)
     implementation(rootProject.libs.jjwt.jackson)
+    implementation(rootProject.libs.springdoc.openapi.starter.webmvc.ui)
     testImplementation("org.springframework.security:spring-security-test")
 }

@@ -7,6 +7,7 @@ mysql-connector = "9.5.0"
 spring-boot = "4.0.6"
 jjwt = "0.13.0"
 testcontainers = "2.0.3"
+springdoc-openapi = "3.0.3"
 
 [plugins]
 build-recipe = { id = "com.linecorp.build-recipe-plugin", version = "1.1.1" }
@@ -23,3 +24,4 @@ kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = 
 jjwt-api = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jjwt" }
 jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
 jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc-openapi" }
