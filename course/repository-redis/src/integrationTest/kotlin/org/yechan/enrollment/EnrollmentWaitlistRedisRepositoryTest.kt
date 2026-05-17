@@ -101,15 +101,56 @@ class EnrollmentWaitlistRedisRepositoryTest : RedisIntegrationTest() {
     }
 
     @Test
-    fun `같은 회원이 같은 강의에 다시 등록하면 기존 대기열을 갱신한다`() {
+    fun `같은 회원이 같은 강의에 다시 등록하면 기존 대기열 순번을 유지한다`() {
         repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
         repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:05Z"))
 
         val result = repository.findByMemberId(10L)
 
         assertThat(result).hasSize(1)
-        assertThat(result.single().requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:05Z"))
-        assertThat(repository.pop(1L)?.requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:05Z"))
+        assertThat(result.single().requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"))
+        assertThat(repository.pop(1L)?.requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"))
+    }
+
+    @Test
+    fun `count는 현재 대기 인원을 반환한다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        assertThat(repository.count(1L)).isEqualTo(2)
+    }
+
+    @Test
+    fun `rank는 1부터 시작하는 순번을 반환하고 대기열에 없으면 null을 반환한다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        assertThat(repository.rank(1L, 10L)).isEqualTo(1)
+        assertThat(repository.rank(1L, 20L)).isEqualTo(2)
+        assertThat(repository.rank(1L, 30L)).isNull()
+    }
+
+    @Test
+    fun `peek는 가장 앞선 대기자를 반환하지만 제거하지 않는다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        val firstPeek = repository.peek(1L)
+        val secondPeek = repository.peek(1L)
+
+        assertThat(firstPeek?.memberId).isEqualTo(10L)
+        assertThat(secondPeek?.memberId).isEqualTo(10L)
+        assertThat(repository.count(1L)).isEqualTo(2)
+    }
+
+    @Test
+    fun `remove 이후 peek는 다음 대기자를 반환한다`() {
+        repository.enqueue(1L, 10L, Instant.parse("2026-01-01T00:00:00Z"))
+        repository.enqueue(1L, 20L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        repository.remove(1L, 10L)
+
+        assertThat(repository.peek(1L)?.memberId).isEqualTo(20L)
     }
 
     @Test
