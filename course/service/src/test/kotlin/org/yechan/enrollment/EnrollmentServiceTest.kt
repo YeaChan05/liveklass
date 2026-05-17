@@ -56,6 +56,23 @@ class EnrollmentServiceTest {
     }
 
     @Test
+    fun `매진 표시 전 신규 수강 신청은 기존 신청을 한 번만 조회한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        assertThat(enrollmentRepository.findByMemberIdAndCourseIdCallCount).isEqualTo(1)
+    }
+
+    @Test
     fun `남은 좌석이 없으면 수강 신청은 대기열에 등록된다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
@@ -520,6 +537,34 @@ class EnrollmentServiceTest {
         assertThat(popped?.memberId).isEqualTo(2L)
         assertThat(enrollments).isEmpty()
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `이미 신청한 클래스메이트는 매진 표시된 강의를 다시 신청해도 대기열에 등록되지 않는다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
+
+        waitlistRepository.markSoldOut(course.courseId)
+
+        val result =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            )
+
+        assertThat(result).isEqualTo(EnrollResult.Enrolled(enrolled))
+        assertThat(waitlistRepository.findByMemberId(2L)).isEmpty()
     }
 
     @Test

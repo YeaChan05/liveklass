@@ -169,6 +169,8 @@ class FakeEnrollmentRepository :
     EnrollmentRepository,
     EnrollmentBulkWriter {
     val enrollments = linkedMapOf<Long, EnrollmentModel>()
+    var findByMemberIdAndCourseIdCallCount = 0
+        private set
     private var nextId = 1L
 
     override fun save(
@@ -202,8 +204,11 @@ class FakeEnrollmentRepository :
     override fun findByMemberIdAndCourseId(
         memberId: Long,
         courseId: Long,
-    ): EnrollmentModel? = enrollments.values.firstOrNull {
-        it.memberId == memberId && it.courseId == courseId
+    ): EnrollmentModel? {
+        findByMemberIdAndCourseIdCallCount += 1
+        return enrollments.values.firstOrNull {
+            it.memberId == memberId && it.courseId == courseId
+        }
     }
 
     override fun findAllByCourseIdsAndMemberIds(
