@@ -25,7 +25,7 @@ class EnrollmentService(
         val courseId = command.courseId
 
         if (waitlistRepository.isSoldOut(courseId)) {
-            enrollmentTransactionService.findPendingOrConfirmedEnrollment(command)?.let {
+            enrollmentTransactionService.findSeatOccupyingEnrollment(command)?.let {
                 return EnrollResult.Enrolled(it)
             }
 

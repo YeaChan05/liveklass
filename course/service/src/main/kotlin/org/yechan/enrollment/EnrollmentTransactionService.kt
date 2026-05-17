@@ -14,7 +14,7 @@ class EnrollmentTransactionService(
     private val enrollmentRepository: EnrollmentRepository,
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) {
-    fun findPendingOrConfirmedEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
+    fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
         memberId = command.memberId,
         courseId = command.courseId,
     )?.takeIf(EnrollmentModel::isSeatOccupied)
