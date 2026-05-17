@@ -55,6 +55,37 @@ class EnrollmentWaitlistRedisRepository(
         )
     }
 
+    override fun peek(courseId: Long): EnrollmentWaitlistEntry? {
+        val entry = redisTemplate.opsForZSet()
+            .rangeWithScores(EnrollmentWaitlistRedisKey.byCourseId(courseId).value, 0, 0)
+            .orEmpty()
+            .firstOrNull()
+            ?: return null
+
+        val memberId = entry.value?.toLongOrNull() ?: return null
+        val requestedAt = entry.score?.toLong() ?: return null
+
+        return EnrollmentWaitlistEntry(
+            courseId = courseId,
+            memberId = memberId,
+            requestedAt = Instant.ofEpochMilli(requestedAt),
+        )
+    }
+
+    override fun count(courseId: Long): Long = redisTemplate.opsForZSet()
+        .zCard(EnrollmentWaitlistRedisKey.byCourseId(courseId).value)
+        ?: 0L
+
+    override fun rank(
+        courseId: Long,
+        memberId: Long,
+    ): Long? = redisTemplate.opsForZSet()
+        .rank(
+            EnrollmentWaitlistRedisKey.byCourseId(courseId).value,
+            memberId.toString(),
+        )
+        ?.plus(1)
+
     override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = findCourseIds()
         .flatMap { courseId ->
             redisTemplate.opsForZSet()
@@ -168,7 +199,7 @@ private sealed interface EnrollmentWaitlistRedisKey {
 private val ENQUEUE_SCRIPT = DefaultRedisScript<Long>().apply {
     @Language("Lua")
     val script = """
-        redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1])
+        redis.call('ZADD', KEYS[1], 'NX', ARGV[2], ARGV[1])
         redis.call('PEXPIRE', KEYS[1], ARGV[3])
         redis.call('ZADD', KEYS[2], ARGV[4], ARGV[4])
         return 1
