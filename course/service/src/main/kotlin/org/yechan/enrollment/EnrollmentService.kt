@@ -18,18 +18,18 @@ interface EnrollmentUseCase {
 
 class EnrollmentService(
     private val enrollmentTransactionService: EnrollmentTransactionService,
-    private val waitlistRepository: EnrollmentWaitlistRepository,
+    private val waitlistCoordinator: EnrollmentWaitlistCoordinator,
 ) : EnrollmentUseCase {
     override fun enroll(command: EnrollCourseCommand): EnrollResult {
         val memberId = command.memberId
         val courseId = command.courseId
 
-        if (waitlistRepository.isSoldOut(courseId)) {
+        if (waitlistCoordinator.isWaitlistMode(courseId)) {
             enrollmentTransactionService.findSeatOccupyingEnrollment(command)?.let {
                 return EnrollResult.Enrolled(it)
             }
 
-            enqueueWaitlist(courseId, memberId)
+            joinWaitlist(courseId, memberId)
             return EnrollResult.Waitlisted(
                 courseId = courseId,
                 memberId = memberId,
@@ -38,7 +38,7 @@ class EnrollmentService(
 
         return when (val result = enrollmentTransactionService.enroll(command)) {
             is EnrollmentEnrollTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
-            EnrollmentEnrollTransactionResult.SoldOut -> rejectSoldOut(courseId, memberId)
+            EnrollmentEnrollTransactionResult.SoldOut -> joinWaitlistAfterSeatReservationFailed(courseId, memberId)
         }
     }
 
@@ -46,17 +46,17 @@ class EnrollmentService(
 
     override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
         val result = enrollmentTransactionService.cancelEnrollment(command)
-        waitlistRepository.clearSoldOut(result.courseId)
+        waitlistCoordinator.promoteAfterSeatRelease(result.courseId)
         return result.enrollment
     }
 
     override fun cancelWaitlist(command: EnrollmentWaitlistCommand) {
-        waitlistRepository.remove(command.courseId, command.memberId)
+        waitlistCoordinator.cancelWaitlist(command.courseId, command.memberId)
     }
 
     override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentTransactionService.getMyEnrollments(memberId)
 
-    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = waitlistRepository.findByMemberId(memberId)
+    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = waitlistCoordinator.findByMemberId(memberId)
         .map {
             WaitlistInfo(
                 courseId = it.courseId,
@@ -65,30 +65,30 @@ class EnrollmentService(
             )
         }
 
-    private fun enqueueWaitlist(
+    private fun joinWaitlist(
         courseId: Long,
         memberId: Long,
     ) {
-        waitlistRepository.enqueue(
+        waitlistCoordinator.joinWaitlist(
             courseId = courseId,
             memberId = memberId,
             requestedAt = Instant.now(),
         )
     }
 
-    private fun rejectSoldOut(
+    private fun joinWaitlistAfterSeatReservationFailed(
         courseId: Long,
         memberId: Long,
     ): EnrollResult.Waitlisted {
-        waitlistRepository.markSoldOut(courseId)
+        waitlistCoordinator.enableWaitlistMode(courseId)
         try {
             enrollmentTransactionService.requireOpenCourse(courseId)
         } catch (e: RuntimeException) {
-            waitlistRepository.clearSoldOut(courseId)
+            waitlistCoordinator.disableWaitlistMode(courseId)
             throw e
         }
 
-        enqueueWaitlist(courseId, memberId)
+        joinWaitlist(courseId, memberId)
         return EnrollResult.Waitlisted(
             courseId = courseId,
             memberId = memberId,
