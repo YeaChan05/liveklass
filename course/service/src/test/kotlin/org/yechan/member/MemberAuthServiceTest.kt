@@ -20,13 +20,12 @@ import java.util.Collections
 class MemberAuthServiceTest {
 
     @Test
-    fun `회원가입 요청은 가입 처리기에 맡긴다`() {
+    fun `회원가입 요청은 쓰기 처리기에 맡긴다`() {
         // Arrange
-        val registrationHandler = RecordingMemberRegistrationHandler()
+        val writer = RecordingMemberAuthWriter()
         val service = MemberAuthService(
-            registrationHandler,
-            RecordingMemberSessionHandler(),
-            RecordingMemberCurrentMemberHandler(),
+            writer,
+            RecordingMemberAuthReader(),
         )
         val command = SignupCommand(
             "student@example.com",
@@ -40,17 +39,16 @@ class MemberAuthServiceTest {
 
         // Assert
         assertThat(result.email).isEqualTo(command.email)
-        assertThat(registrationHandler.signupCommands).containsExactly(command)
+        assertThat(writer.signupCommands).containsExactly(command)
     }
 
     @Test
-    fun `세션 요청은 세션 처리기에 맡긴다`() {
+    fun `세션 요청은 쓰기 처리기에 맡긴다`() {
         // Arrange
-        val sessionHandler = RecordingMemberSessionHandler()
+        val writer = RecordingMemberAuthWriter()
         val service = MemberAuthService(
-            RecordingMemberRegistrationHandler(),
-            sessionHandler,
-            RecordingMemberCurrentMemberHandler(),
+            writer,
+            RecordingMemberAuthReader(),
         )
         val loginCommand = LoginCommand("student@example.com", "password1234!")
         val refreshCommand = RefreshTokenCommand("refresh-token")
@@ -62,19 +60,18 @@ class MemberAuthServiceTest {
         service.logout(logoutCommand)
 
         // Assert
-        assertThat(sessionHandler.loginCommands).containsExactly(loginCommand)
-        assertThat(sessionHandler.refreshCommands).containsExactly(refreshCommand)
-        assertThat(sessionHandler.logoutCommands).containsExactly(logoutCommand)
+        assertThat(writer.loginCommands).containsExactly(loginCommand)
+        assertThat(writer.refreshCommands).containsExactly(refreshCommand)
+        assertThat(writer.logoutCommands).containsExactly(logoutCommand)
     }
 
     @Test
-    fun `현재 회원 조회 요청은 조회 처리기에 맡긴다`() {
+    fun `현재 회원 조회 요청은 읽기 처리기에 맡긴다`() {
         // Arrange
-        val currentMemberHandler = RecordingMemberCurrentMemberHandler()
+        val reader = RecordingMemberAuthReader()
         val service = MemberAuthService(
-            RecordingMemberRegistrationHandler(),
-            RecordingMemberSessionHandler(),
-            currentMemberHandler,
+            RecordingMemberAuthWriter(),
+            reader,
         )
 
         // Act
@@ -84,8 +81,8 @@ class MemberAuthServiceTest {
         // Assert
         assertThat(byId.id).isEqualTo(1L)
         assertThat(byEmail.email).isEqualTo("student@example.com")
-        assertThat(currentMemberHandler.requestedUserIds).containsExactly(1L)
-        assertThat(currentMemberHandler.requestedEmails).containsExactly("student@example.com")
+        assertThat(reader.requestedUserIds).containsExactly(1L)
+        assertThat(reader.requestedEmails).containsExactly("student@example.com")
     }
     private val members = FakeMemberRepository()
     private val refreshTokens = FakeRefreshTokenRepository()
@@ -97,11 +94,7 @@ class MemberAuthServiceTest {
     private val authTokenProperties = AuthTokenProperties("test-salt", 1800, 604800)
     private val service =
         MemberAuthService(
-            MemberRegistrationProcessor(
-                members,
-                passwordHashEncoder,
-            ),
-            MemberSessionProcessor(
+            MemberAuthRepositoryWriter(
                 members,
                 refreshTokens,
                 passwordHashEncoder,
@@ -111,7 +104,7 @@ class MemberAuthServiceTest {
                 accessTokenBlacklistRepository,
                 authTokenProperties,
             ),
-            MemberCurrentMemberProcessor(members),
+            MemberRepositoryReader(members),
         )
 
     @Test
@@ -529,8 +522,11 @@ class MemberAuthServiceTest {
         fun ttlOf(token: String): Duration? = tokens[token]
     }
 
-    private class RecordingMemberRegistrationHandler : MemberRegistrationHandler {
+    private class RecordingMemberAuthWriter : MemberAuthWriter {
         val signupCommands = mutableListOf<SignupCommand>()
+        val loginCommands = mutableListOf<LoginCommand>()
+        val refreshCommands = mutableListOf<RefreshTokenCommand>()
+        val logoutCommands = mutableListOf<LogoutCommand>()
 
         override fun signup(command: SignupCommand): SignupResult {
             signupCommands += command
@@ -541,12 +537,6 @@ class MemberAuthServiceTest {
                 role = command.role,
             )
         }
-    }
-
-    private class RecordingMemberSessionHandler : MemberSessionHandler {
-        val loginCommands = mutableListOf<LoginCommand>()
-        val refreshCommands = mutableListOf<RefreshTokenCommand>()
-        val logoutCommands = mutableListOf<LogoutCommand>()
 
         override fun login(command: LoginCommand): LoginResult {
             loginCommands += command
@@ -573,7 +563,7 @@ class MemberAuthServiceTest {
         }
     }
 
-    private class RecordingMemberCurrentMemberHandler : MemberCurrentMemberHandler {
+    private class RecordingMemberAuthReader : MemberAuthReader {
         val requestedUserIds = mutableListOf<Long>()
         val requestedEmails = mutableListOf<String>()
 

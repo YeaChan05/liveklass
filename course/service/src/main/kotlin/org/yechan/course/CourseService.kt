@@ -17,13 +17,15 @@ interface CourseUseCase {
     fun closeCourse(command: CourseStatusCommand): CourseResult
 }
 
-interface CourseQueryHandler {
+interface CourseReader {
     fun getCourse(courseId: Long): CourseResult
 
     fun getCourses(status: CourseStatus? = null): List<CourseResult>
+
+    fun getOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseResult>
 }
 
-interface CourseCommandHandler {
+interface CourseWriter {
     fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult
 
     fun openCourse(command: CourseStatusCommand): CourseResult
@@ -32,40 +34,42 @@ interface CourseCommandHandler {
 }
 
 class CourseService(
-    private val queryHandler: CourseQueryHandler,
-    private val commandHandler: CourseCommandHandler,
+    private val reader: CourseReader,
+    private val writer: CourseWriter,
 ) : CourseUseCase {
-    override fun getCourse(courseId: Long): CourseResult = queryHandler.getCourse(courseId)
+    override fun getCourse(courseId: Long): CourseResult = reader.getCourse(courseId)
 
-    override fun getCourses(status: CourseStatus?): List<CourseResult> = queryHandler.getCourses(status)
+    override fun getCourses(status: CourseStatus?): List<CourseResult> = reader.getCourses(status)
 
     override fun createCourse(
         command: CreateCourseCommand,
         creatorId: Long,
-    ): CourseResult = commandHandler.createCourse(command, creatorId)
+    ): CourseResult = writer.createCourse(command, creatorId)
 
-    override fun openCourse(command: CourseStatusCommand): CourseResult = commandHandler.openCourse(command)
+    override fun openCourse(command: CourseStatusCommand): CourseResult = writer.openCourse(command)
 
-    override fun closeCourse(command: CourseStatusCommand): CourseResult = commandHandler.closeCourse(command)
+    override fun closeCourse(command: CourseStatusCommand): CourseResult = writer.closeCourse(command)
 }
 
 @Transactional(readOnly = true)
-class CourseQueryProcessor(
+class CourseRepositoryReader(
     private val courseRepository: CourseRepository,
-) : CourseQueryHandler {
+) : CourseReader {
     override fun getCourse(courseId: Long): CourseResult = (courseRepository.findById(courseId) ?: throw CourseNotFoundException()).toResult()
 
     override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
         null -> courseRepository.findAll()
         else -> courseRepository.findAllByStatus(status)
     }.map(CourseModel::toResult)
+
+    override fun getOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseResult> = courseRepository.findAllOpenedCoursesByIds(courseIds).map(CourseModel::toResult)
 }
 
 @Transactional(readOnly = true)
-class CourseCommandProcessor(
+class CourseRepositoryWriter(
     private val memberRepository: MemberRepository,
     private val courseRepository: CourseRepository,
-) : CourseCommandHandler {
+) : CourseWriter {
     @Transactional
     override fun createCourse(
         command: CreateCourseCommand,

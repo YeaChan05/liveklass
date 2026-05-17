@@ -6,8 +6,8 @@ import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.FakeMemberRepository
-import org.yechan.course.CourseCommandProcessor
-import org.yechan.course.CourseQueryProcessor
+import org.yechan.course.CourseRepositoryReader
+import org.yechan.course.CourseRepositoryWriter
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -28,13 +28,17 @@ class EnrollmentPaymentExpirationSchedulerTest {
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(
-        CourseQueryProcessor(courseRepository),
-        CourseCommandProcessor(memberRepository, courseRepository),
+        CourseRepositoryReader(courseRepository),
+        CourseRepositoryWriter(memberRepository, courseRepository),
     )
-    private val enrollmentTransactionService =
-        EnrollmentTransactionService(courseRepository, enrollmentRepository)
-    private val waitlistPromotionCoordinator =
-        EnrollmentWaitlistCoordinator(
+    private val enrollmentReader =
+        EnrollmentRepositoryReader(courseRepository, enrollmentRepository)
+    private val enrollmentWriter =
+        EnrollmentRepositoryWriter(courseRepository, enrollmentRepository)
+    private val waitlistReader =
+        EnrollmentWaitlistRepositoryReader(waitlistRepository)
+    private val waitlistWriter =
+        EnrollmentWaitlistRepositoryWriter(
             waitlistRepository,
             EnrollmentWaitlistPromotionService(
                 courseRepository,
@@ -43,7 +47,7 @@ class EnrollmentPaymentExpirationSchedulerTest {
             ),
         )
     private val enrollmentService =
-        EnrollmentService(enrollmentTransactionService, waitlistPromotionCoordinator)
+        EnrollmentService(enrollmentReader, enrollmentWriter, waitlistReader, waitlistWriter)
 
     @Test
     fun `결제 만료 스케줄러는 전용 서비스만 호출한다`() {
@@ -80,12 +84,12 @@ class EnrollmentPaymentExpirationSchedulerTest {
         waitlistRepository.markSoldOut(course.courseId)
 
         val expirationService = EnrollmentPaymentExpirationService(
-            enrollmentRepository = enrollmentRepository,
+            enrollmentReader = enrollmentReader,
             enrollmentExpirationProcessor = EnrollmentExpirationService(
                 enrollmentBulkWriter = enrollmentRepository,
                 courseBulkWriter = courseRepository,
             ),
-            waitlistCoordinator = waitlistPromotionCoordinator,
+            waitlistWriter = waitlistWriter,
             clock = clock,
         )
 
@@ -125,12 +129,12 @@ class EnrollmentPaymentExpirationSchedulerTest {
         enrollmentService.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
 
         val expirationService = EnrollmentPaymentExpirationService(
-            enrollmentRepository = enrollmentRepository,
+            enrollmentReader = enrollmentReader,
             enrollmentExpirationProcessor = EnrollmentExpirationService(
                 enrollmentBulkWriter = enrollmentRepository,
                 courseBulkWriter = courseRepository,
             ),
-            waitlistCoordinator = waitlistPromotionCoordinator,
+            waitlistWriter = waitlistWriter,
             clock = clock,
         )
 
@@ -149,12 +153,12 @@ class EnrollmentPaymentExpirationSchedulerTest {
     @Test
     fun `만료 대상이 없으면 processor를 호출하지 않는다`() {
         val expirationService = EnrollmentPaymentExpirationService(
-            enrollmentRepository = enrollmentRepository,
+            enrollmentReader = enrollmentReader,
             enrollmentExpirationProcessor = EnrollmentExpirationService(
                 enrollmentBulkWriter = enrollmentRepository,
                 courseBulkWriter = courseRepository,
             ),
-            waitlistCoordinator = waitlistPromotionCoordinator,
+            waitlistWriter = waitlistWriter,
             clock = clock,
         )
 

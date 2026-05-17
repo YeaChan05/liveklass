@@ -9,21 +9,58 @@ import java.time.Duration
 import java.time.LocalDateTime
 
 @Transactional(readOnly = true)
-class EnrollmentTransactionService(
+class EnrollmentRepositoryReader(
     private val courseRepository: CourseRepository,
     private val enrollmentRepository: EnrollmentRepository,
-    private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
-) {
-    fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
+) : EnrollmentReader {
+    override fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
         memberId = command.memberId,
         courseId = command.courseId,
     )?.takeIf(EnrollmentModel::isSeatOccupied)
         ?.toResult()
 
-    fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
 
+    override fun requireOpenCourse(courseId: Long) {
+        val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()
+        course.validateIsOpen()
+    }
+
+    override fun findExpiredPaymentPendingTargets(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<EnrollmentExpirationTarget> = enrollmentRepository.findExpiredPaymentPendingTargets(now = now, limit = limit)
+}
+
+interface EnrollmentReader {
+    fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo?
+
+    fun getMyEnrollments(memberId: Long): List<EnrollmentInfo>
+
+    fun requireOpenCourse(courseId: Long)
+
+    fun findExpiredPaymentPendingTargets(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<EnrollmentExpirationTarget>
+}
+
+interface EnrollmentWriter {
+    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult
+
+    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo
+
+    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentCancelResult
+}
+
+@Transactional(readOnly = true)
+class EnrollmentRepositoryWriter(
+    private val courseRepository: CourseRepository,
+    private val enrollmentRepository: EnrollmentRepository,
+    private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
+) : EnrollmentWriter {
     @Transactional
-    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
+    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
         val memberId = command.memberId
         val courseId = command.courseId
         val now = LocalDateTime.now()
@@ -61,14 +98,14 @@ class EnrollmentTransactionService(
     }
 
     @Transactional
-    fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
+    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
         val confirmed = enrollment.confirm()
         return enrollmentRepository.save(confirmed).toResult()
     }
 
     @Transactional
-    fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentCancelResult {
+    override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentCancelResult {
         val enrollment = ownedEnrollment(command.enrollmentId, command.memberId)
         val cancelled = enrollment.cancel()
         val savedEnrollment = enrollmentRepository.save(cancelled)
@@ -80,11 +117,6 @@ class EnrollmentTransactionService(
             enrollment = savedEnrollment.toResult(),
             courseId = enrollment.courseId,
         )
-    }
-
-    fun requireOpenCourse(courseId: Long) {
-        val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()
-        course.validateIsOpen()
     }
 
     private fun insert(

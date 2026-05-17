@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test
 import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
-import org.yechan.course.CourseCommandProcessor
 import org.yechan.course.CourseModelData
-import org.yechan.course.CourseQueryProcessor
+import org.yechan.course.CourseRepositoryReader
+import org.yechan.course.CourseRepositoryWriter
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatus
 import org.yechan.course.CourseStatusCommand
@@ -29,28 +29,32 @@ class EnrollmentWaitlistSchedulerTest {
     private val courseBulkWriter = courseRepository
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(
-        CourseQueryProcessor(courseRepository),
-        CourseCommandProcessor(memberRepository, courseRepository),
+        CourseRepositoryReader(courseRepository),
+        CourseRepositoryWriter(memberRepository, courseRepository),
     )
-    private val enrollmentTransactionService =
-        EnrollmentTransactionService(courseRepository, enrollmentRepository)
+    private val enrollmentReader =
+        EnrollmentRepositoryReader(courseRepository, enrollmentRepository)
+    private val enrollmentWriter =
+        EnrollmentRepositoryWriter(courseRepository, enrollmentRepository)
     private val enrollmentWaitlistProcessor =
         EnrollmentWaitlistPromotionService(
             courseBulkWriter,
             enrollmentRepository,
             enrollmentRepository,
         )
-    private val waitlistPromotionCoordinator =
-        EnrollmentWaitlistCoordinator(
+    private val waitlistReader =
+        EnrollmentWaitlistRepositoryReader(waitlistRepository)
+    private val waitlistWriter =
+        EnrollmentWaitlistRepositoryWriter(
             waitlistRepository,
             enrollmentWaitlistProcessor,
         )
     private val enrollmentService =
-        EnrollmentService(enrollmentTransactionService, waitlistPromotionCoordinator)
+        EnrollmentService(enrollmentReader, enrollmentWriter, waitlistReader, waitlistWriter)
     private val recoveryService = WaitlistPromotionRecoveryService(
-        waitlistRepository,
-        courseRepository,
-        waitlistPromotionCoordinator,
+        waitlistReader,
+        CourseRepositoryReader(courseRepository),
+        waitlistWriter,
     )
 
     @Test
@@ -187,9 +191,9 @@ class EnrollmentWaitlistSchedulerTest {
             enrollmentRepository,
         )
         val failingRecoveryService = WaitlistPromotionRecoveryService(
-            waitlistRepository,
-            courseRepository,
-            EnrollmentWaitlistCoordinator(waitlistRepository, failingProcessor),
+            waitlistReader,
+            CourseRepositoryReader(courseRepository),
+            EnrollmentWaitlistRepositoryWriter(waitlistRepository, failingProcessor),
         )
 
         assertThatThrownBy { failingRecoveryService.recoverPromotions() }
@@ -240,7 +244,7 @@ class EnrollmentWaitlistSchedulerTest {
         ).enrollment
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:00Z"))
 
-        enrollmentTransactionService.cancelEnrollment(
+        enrollmentWriter.cancelEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
                 enrollmentId = enrollment.enrollmentId,
@@ -254,9 +258,9 @@ class EnrollmentWaitlistSchedulerTest {
             Duration.ofMinutes(3),
         )
         val customRecoveryService = WaitlistPromotionRecoveryService(
-            waitlistRepository,
-            courseRepository,
-            EnrollmentWaitlistCoordinator(waitlistRepository, customProcessor),
+            waitlistReader,
+            CourseRepositoryReader(courseRepository),
+            EnrollmentWaitlistRepositoryWriter(waitlistRepository, customProcessor),
         )
 
         customRecoveryService.recoverPromotions()

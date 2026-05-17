@@ -17,15 +17,17 @@ interface EnrollmentUseCase {
 }
 
 class EnrollmentService(
-    private val enrollmentTransactionService: EnrollmentTransactionService,
-    private val waitlistCoordinator: EnrollmentWaitlistCoordinator,
+    private val enrollmentReader: EnrollmentReader,
+    private val enrollmentWriter: EnrollmentWriter,
+    private val waitlistReader: EnrollmentWaitlistReader,
+    private val waitlistWriter: EnrollmentWaitlistWriter,
 ) : EnrollmentUseCase {
     override fun enroll(command: EnrollCourseCommand): EnrollResult {
         val memberId = command.memberId
         val courseId = command.courseId
 
-        if (waitlistCoordinator.isWaitlistMode(courseId)) {
-            enrollmentTransactionService.findSeatOccupyingEnrollment(command)?.let {
+        if (waitlistReader.isWaitlistMode(courseId)) {
+            enrollmentReader.findSeatOccupyingEnrollment(command)?.let {
                 return EnrollResult.Enrolled(it)
             }
 
@@ -36,27 +38,27 @@ class EnrollmentService(
             )
         }
 
-        return when (val result = enrollmentTransactionService.enroll(command)) {
+        return when (val result = enrollmentWriter.enroll(command)) {
             is EnrollmentEnrollTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
             EnrollmentEnrollTransactionResult.SoldOut -> joinWaitlistAfterSeatReservationFailed(courseId, memberId)
         }
     }
 
-    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo = enrollmentTransactionService.confirmEnrollment(command)
+    override fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo = enrollmentWriter.confirmEnrollment(command)
 
     override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
-        val result = enrollmentTransactionService.cancelEnrollment(command)
-        waitlistCoordinator.promoteAfterSeatRelease(result.courseId)
+        val result = enrollmentWriter.cancelEnrollment(command)
+        waitlistWriter.promoteAfterSeatRelease(result.courseId)
         return result.enrollment
     }
 
     override fun cancelWaitlist(command: EnrollmentWaitlistCommand) {
-        waitlistCoordinator.cancelWaitlist(command.courseId, command.memberId)
+        waitlistWriter.cancelWaitlist(command.courseId, command.memberId)
     }
 
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentTransactionService.getMyEnrollments(memberId)
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentReader.getMyEnrollments(memberId)
 
-    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = waitlistCoordinator.findByMemberId(memberId)
+    override fun getMyWaitlist(memberId: Long): List<WaitlistInfo> = waitlistReader.findByMemberId(memberId)
         .map {
             WaitlistInfo(
                 courseId = it.courseId,
@@ -69,7 +71,7 @@ class EnrollmentService(
         courseId: Long,
         memberId: Long,
     ) {
-        waitlistCoordinator.joinWaitlist(
+        waitlistWriter.joinWaitlist(
             courseId = courseId,
             memberId = memberId,
             requestedAt = Instant.now(),
@@ -80,11 +82,11 @@ class EnrollmentService(
         courseId: Long,
         memberId: Long,
     ): EnrollResult.Waitlisted {
-        waitlistCoordinator.enableWaitlistMode(courseId)
+        waitlistWriter.enableWaitlistMode(courseId)
         try {
-            enrollmentTransactionService.requireOpenCourse(courseId)
+            enrollmentReader.requireOpenCourse(courseId)
         } catch (e: RuntimeException) {
-            waitlistCoordinator.disableWaitlistMode(courseId)
+            waitlistWriter.disableWaitlistMode(courseId)
             throw e
         }
 

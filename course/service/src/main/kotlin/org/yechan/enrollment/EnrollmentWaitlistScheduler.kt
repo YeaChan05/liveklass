@@ -1,8 +1,7 @@
 package org.yechan.enrollment
 
 import org.springframework.scheduling.annotation.Scheduled
-import org.yechan.course.CourseRepository
-import org.yechan.course.CourseStatus
+import org.yechan.course.CourseReader
 
 interface WaitlistPromotionRecoveryUseCase {
     fun recoverPromotions()
@@ -18,23 +17,23 @@ open class EnrollmentWaitlistScheduler(
 }
 
 class WaitlistPromotionRecoveryService(
-    private val waitlistRepository: EnrollmentWaitlistRepository,
-    private val courseRepository: CourseRepository,
-    private val waitlistCoordinator: EnrollmentWaitlistCoordinator,
+    private val waitlistReader: EnrollmentWaitlistReader,
+    private val courseReader: CourseReader,
+    private val waitlistWriter: EnrollmentWaitlistWriter,
 ) : WaitlistPromotionRecoveryUseCase {
     override fun recoverPromotions() {
-        val courseIds = waitlistRepository.findCourseIds().ifEmpty { return }
+        val courseIds = waitlistReader.findCourseIds().ifEmpty { return }
 
-        val courses = courseRepository.findAllOpenedCoursesByIds(courseIds)
+        val courses = courseReader.getOpenedCoursesByIds(courseIds)
         courses.forEach { course ->
-            val courseId = course.courseId ?: return@forEach
+            val courseId = course.courseId
             val promotableCount = course.seatLeftCount
 
-            if (course.status != CourseStatus.OPEN || promotableCount <= 0) {
+            if (promotableCount <= 0) {
                 return@forEach
             }
 
-            waitlistCoordinator.promoteAfterSeatRelease(courseId, promotableCount)
+            waitlistWriter.promoteAfterSeatRelease(courseId, promotableCount)
         }
     }
 }

@@ -3,21 +3,59 @@ package org.yechan.enrollment
 import java.time.Instant
 import java.time.LocalDateTime
 
-class EnrollmentWaitlistCoordinator(
+interface EnrollmentWaitlistReader {
+    fun isWaitlistMode(courseId: Long): Boolean
+
+    fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry>
+
+    fun findCourseIds(): Set<Long>
+}
+
+interface EnrollmentWaitlistWriter {
+    fun enableWaitlistMode(courseId: Long)
+
+    fun disableWaitlistMode(courseId: Long)
+
+    fun joinWaitlist(
+        courseId: Long,
+        memberId: Long,
+        requestedAt: Instant,
+    )
+
+    fun cancelWaitlist(
+        courseId: Long,
+        memberId: Long,
+    )
+
+    fun promoteAfterSeatRelease(
+        courseId: Long,
+        returnedSeatCount: Int = 1,
+    )
+}
+
+class EnrollmentWaitlistRepositoryReader(
+    private val waitlistRepository: EnrollmentWaitlistRepository,
+) : EnrollmentWaitlistReader {
+    override fun isWaitlistMode(courseId: Long): Boolean = waitlistRepository.isSoldOut(courseId)
+
+    override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = waitlistRepository.findByMemberId(memberId)
+
+    override fun findCourseIds(): Set<Long> = waitlistRepository.findCourseIds()
+}
+
+class EnrollmentWaitlistRepositoryWriter(
     private val waitlistRepository: EnrollmentWaitlistRepository,
     private val enrollmentWaitlistProcessor: EnrollmentWaitlistProcessor,
-) {
-    fun isWaitlistMode(courseId: Long): Boolean = waitlistRepository.isSoldOut(courseId)
-
-    fun enableWaitlistMode(courseId: Long) {
+) : EnrollmentWaitlistWriter {
+    override fun enableWaitlistMode(courseId: Long) {
         waitlistRepository.markSoldOut(courseId)
     }
 
-    fun disableWaitlistMode(courseId: Long) {
+    override fun disableWaitlistMode(courseId: Long) {
         waitlistRepository.clearSoldOut(courseId)
     }
 
-    fun joinWaitlist(
+    override fun joinWaitlist(
         courseId: Long,
         memberId: Long,
         requestedAt: Instant,
@@ -29,18 +67,16 @@ class EnrollmentWaitlistCoordinator(
         )
     }
 
-    fun cancelWaitlist(
+    override fun cancelWaitlist(
         courseId: Long,
         memberId: Long,
     ) {
         waitlistRepository.remove(courseId, memberId)
     }
 
-    fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = waitlistRepository.findByMemberId(memberId)
-
-    fun promoteAfterSeatRelease(
+    override fun promoteAfterSeatRelease(
         courseId: Long,
-        returnedSeatCount: Int = 1,
+        returnedSeatCount: Int,
     ) {
         try {
             repeat(returnedSeatCount.coerceAtLeast(0)) {

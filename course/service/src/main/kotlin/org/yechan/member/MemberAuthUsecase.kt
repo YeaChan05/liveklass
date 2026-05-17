@@ -25,11 +25,9 @@ interface MemberAuthUseCase {
     fun getCurrentUserByEmail(email: String): CurrentMemberResult
 }
 
-interface MemberRegistrationHandler {
+interface MemberAuthWriter {
     fun signup(command: SignupCommand): SignupResult
-}
 
-interface MemberSessionHandler {
     fun login(command: LoginCommand): LoginResult
 
     fun refresh(command: RefreshTokenCommand): RefreshTokenResult
@@ -37,37 +35,42 @@ interface MemberSessionHandler {
     fun logout(command: LogoutCommand)
 }
 
-interface MemberCurrentMemberHandler {
+interface MemberAuthReader {
     fun getCurrentUser(userId: Long): CurrentMemberResult
 
     fun getCurrentUserByEmail(email: String): CurrentMemberResult
 }
 
 class MemberAuthService(
-    private val registrationHandler: MemberRegistrationHandler,
-    private val sessionHandler: MemberSessionHandler,
-    private val currentMemberHandler: MemberCurrentMemberHandler,
+    private val writer: MemberAuthWriter,
+    private val reader: MemberAuthReader,
 ) : MemberAuthUseCase {
-    override fun signup(command: SignupCommand): SignupResult = registrationHandler.signup(command)
+    override fun signup(command: SignupCommand): SignupResult = writer.signup(command)
 
-    override fun login(command: LoginCommand): LoginResult = sessionHandler.login(command)
+    override fun login(command: LoginCommand): LoginResult = writer.login(command)
 
-    override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = sessionHandler.refresh(command)
+    override fun refresh(command: RefreshTokenCommand): RefreshTokenResult = writer.refresh(command)
 
     override fun logout(command: LogoutCommand) {
-        sessionHandler.logout(command)
+        writer.logout(command)
     }
 
-    override fun getCurrentUser(userId: Long): CurrentMemberResult = currentMemberHandler.getCurrentUser(userId)
+    override fun getCurrentUser(userId: Long): CurrentMemberResult = reader.getCurrentUser(userId)
 
-    override fun getCurrentUserByEmail(email: String): CurrentMemberResult = currentMemberHandler.getCurrentUserByEmail(email)
+    override fun getCurrentUserByEmail(email: String): CurrentMemberResult = reader.getCurrentUserByEmail(email)
 }
 
 @Transactional(readOnly = true)
-class MemberRegistrationProcessor(
+class MemberAuthRepositoryWriter(
     private val memberRepository: MemberRepository,
+    private val refreshTokenRepository: RefreshTokenRepository,
     private val passwordHashEncoder: PasswordHashEncoder,
-) : MemberRegistrationHandler {
+    private val tokenGenerator: TokenGenerator,
+    private val tokenVerifier: TokenVerifier,
+    private val tokenExpirationResolver: TokenExpirationResolver,
+    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
+    private val authTokenProperties: AuthTokenProperties,
+) : MemberAuthWriter {
     @Transactional
     override fun signup(command: SignupCommand): SignupResult {
         val email = command.email.trim()
@@ -92,19 +95,7 @@ class MemberRegistrationProcessor(
             role = member.role,
         )
     }
-}
 
-@Transactional(readOnly = true)
-class MemberSessionProcessor(
-    private val memberRepository: MemberRepository,
-    private val refreshTokenRepository: RefreshTokenRepository,
-    private val passwordHashEncoder: PasswordHashEncoder,
-    private val tokenGenerator: TokenGenerator,
-    private val tokenVerifier: TokenVerifier,
-    private val tokenExpirationResolver: TokenExpirationResolver,
-    private val accessTokenBlacklistRepository: AccessTokenBlacklistRepository,
-    private val authTokenProperties: AuthTokenProperties,
-) : MemberSessionHandler {
     @Transactional
     override fun login(command: LoginCommand): LoginResult {
         val member = memberRepository.findByEmail(command.email.trim())
@@ -186,9 +177,9 @@ class MemberSessionProcessor(
 }
 
 @Transactional(readOnly = true)
-class MemberCurrentMemberProcessor(
+class MemberRepositoryReader(
     private val memberRepository: MemberRepository,
-) : MemberCurrentMemberHandler {
+) : MemberAuthReader {
     override fun getCurrentUser(userId: Long): CurrentMemberResult {
         val member = memberRepository.findById(userId)
             ?: throw MemberNotFoundException()

@@ -7,10 +7,10 @@ import org.yechan.FakeCourseRepository
 import org.yechan.FakeEnrollmentRepository
 import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.FakeMemberRepository
-import org.yechan.course.CourseCommandProcessor
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
-import org.yechan.course.CourseQueryProcessor
+import org.yechan.course.CourseRepositoryReader
+import org.yechan.course.CourseRepositoryWriter
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -29,13 +29,17 @@ class EnrollmentServiceTest {
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
     private val courseService = CourseService(
-        CourseQueryProcessor(courseRepository),
-        CourseCommandProcessor(memberRepository, courseRepository),
+        CourseRepositoryReader(courseRepository),
+        CourseRepositoryWriter(memberRepository, courseRepository),
     )
-    private val enrollmentTransactionService =
-        EnrollmentTransactionService(courseRepository, enrollmentRepository)
-    private val waitlistPromotionCoordinator =
-        EnrollmentWaitlistCoordinator(
+    private val enrollmentReader =
+        EnrollmentRepositoryReader(courseRepository, enrollmentRepository)
+    private val enrollmentWriter =
+        EnrollmentRepositoryWriter(courseRepository, enrollmentRepository)
+    private val waitlistReader =
+        EnrollmentWaitlistRepositoryReader(waitlistRepository)
+    private val waitlistWriter =
+        EnrollmentWaitlistRepositoryWriter(
             waitlistRepository,
             EnrollmentWaitlistPromotionService(
                 courseRepository,
@@ -45,8 +49,10 @@ class EnrollmentServiceTest {
         )
     private val service =
         EnrollmentService(
-            enrollmentTransactionService,
-            waitlistPromotionCoordinator,
+            enrollmentReader,
+            enrollmentWriter,
+            waitlistReader,
+            waitlistWriter,
         )
 
     @Test
@@ -725,7 +731,7 @@ class EnrollmentServiceTest {
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
-        val customTransactionService = EnrollmentTransactionService(
+        val customTransactionService = EnrollmentRepositoryWriter(
             courseRepository = courseRepository,
             enrollmentRepository = enrollmentRepository,
             paymentPendingExpiresIn = Duration.ofMinutes(3),

@@ -15,8 +15,8 @@ class CourseServiceTest {
     @Test
     fun `조회 요청은 조회 처리기에 맡긴다`() {
         // Arrange
-        val queryProcessor = RecordingCourseQueryHandler()
-        val service = CourseService(queryProcessor, RecordingCourseCommandHandler())
+        val queryProcessor = RecordingCourseReader()
+        val service = CourseService(queryProcessor, RecordingCourseWriter())
 
         // Act
         val course = service.getCourse(10L)
@@ -32,8 +32,8 @@ class CourseServiceTest {
     @Test
     fun `변경 요청은 명령 처리기에 맡긴다`() {
         // Arrange
-        val commandProcessor = RecordingCourseCommandHandler()
-        val service = CourseService(RecordingCourseQueryHandler(), commandProcessor)
+        val commandProcessor = RecordingCourseWriter()
+        val service = CourseService(RecordingCourseReader(), commandProcessor)
         val createCommand = createCourseCommand()
         val statusCommand = CourseStatusCommand(memberId = 1L, courseId = 10L)
 
@@ -50,8 +50,8 @@ class CourseServiceTest {
     private val memberRepository = FakeMemberRepository()
     private val courseRepository = FakeCourseRepository()
     private val service = CourseService(
-        CourseQueryProcessor(courseRepository),
-        CourseCommandProcessor(memberRepository, courseRepository),
+        CourseRepositoryReader(courseRepository),
+        CourseRepositoryWriter(memberRepository, courseRepository),
     )
 
     @Test
@@ -348,7 +348,7 @@ class CourseServiceTest {
         role = role,
     )
 
-    private class RecordingCourseQueryHandler : CourseQueryHandler {
+    private class RecordingCourseReader : CourseReader {
         val requestedCourseIds = mutableListOf<Long>()
         val requestedStatuses = mutableListOf<CourseStatus?>()
 
@@ -361,9 +361,11 @@ class CourseServiceTest {
             requestedStatuses += status
             return listOf(courseResult(status = status ?: CourseStatus.DRAFT))
         }
+
+        override fun getOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseResult> = courseIds.map { courseResult(courseId = it, status = CourseStatus.OPEN) }
     }
 
-    private class RecordingCourseCommandHandler : CourseCommandHandler {
+    private class RecordingCourseWriter : CourseWriter {
         val createdCommands = mutableListOf<Pair<CreateCourseCommand, Long>>()
         val openedCommands = mutableListOf<CourseStatusCommand>()
         val closedCommands = mutableListOf<CourseStatusCommand>()

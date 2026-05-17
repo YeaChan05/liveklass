@@ -4,8 +4,8 @@ import org.springframework.beans.factory.BeanRegistrarDsl
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Import
-import org.yechan.course.CourseCommandProcessor
-import org.yechan.course.CourseQueryProcessor
+import org.yechan.course.CourseRepositoryReader
+import org.yechan.course.CourseRepositoryWriter
 import org.yechan.course.CourseService
 import org.yechan.course.CourseUseCase
 import org.yechan.enrollment.EnrollmentExpirationProcessor
@@ -13,19 +13,20 @@ import org.yechan.enrollment.EnrollmentExpirationService
 import org.yechan.enrollment.EnrollmentPaymentExpirationScheduler
 import org.yechan.enrollment.EnrollmentPaymentExpirationService
 import org.yechan.enrollment.EnrollmentPaymentPendingProperties
+import org.yechan.enrollment.EnrollmentRepositoryReader
+import org.yechan.enrollment.EnrollmentRepositoryWriter
 import org.yechan.enrollment.EnrollmentService
-import org.yechan.enrollment.EnrollmentTransactionService
 import org.yechan.enrollment.EnrollmentUseCase
-import org.yechan.enrollment.EnrollmentWaitlistCoordinator
 import org.yechan.enrollment.EnrollmentWaitlistProcessor
 import org.yechan.enrollment.EnrollmentWaitlistPromotionService
+import org.yechan.enrollment.EnrollmentWaitlistRepositoryReader
+import org.yechan.enrollment.EnrollmentWaitlistRepositoryWriter
 import org.yechan.enrollment.EnrollmentWaitlistScheduler
 import org.yechan.enrollment.WaitlistPromotionRecoveryService
+import org.yechan.member.MemberAuthRepositoryWriter
 import org.yechan.member.MemberAuthService
 import org.yechan.member.MemberAuthUseCase
-import org.yechan.member.MemberCurrentMemberProcessor
-import org.yechan.member.MemberRegistrationProcessor
-import org.yechan.member.MemberSessionProcessor
+import org.yechan.member.MemberRepositoryReader
 import java.time.Clock
 
 @Import(ServiceBeanRegistrar::class)
@@ -36,24 +37,30 @@ class ServiceAutoConfiguration
 @AutoConfiguration
 class ServiceBeanRegistrar :
     BeanRegistrarDsl({
-        registerBean<CourseQueryProcessor> {
-            CourseQueryProcessor(bean())
+        registerBean<CourseRepositoryReader> {
+            CourseRepositoryReader(bean())
         }
-        registerBean<CourseCommandProcessor> {
-            CourseCommandProcessor(
+        registerBean<CourseRepositoryWriter> {
+            CourseRepositoryWriter(
                 bean(),
                 bean(),
             )
         }
         registerBean<CourseUseCase> {
             CourseService(
-                bean<CourseQueryProcessor>(),
-                bean<CourseCommandProcessor>(),
+                bean<CourseRepositoryReader>(),
+                bean<CourseRepositoryWriter>(),
             )
         }
 
-        registerBean<EnrollmentTransactionService> {
-            EnrollmentTransactionService(
+        registerBean<EnrollmentRepositoryReader> {
+            EnrollmentRepositoryReader(
+                bean(),
+                bean(),
+            )
+        }
+        registerBean<EnrollmentRepositoryWriter> {
+            EnrollmentRepositoryWriter(
                 bean(),
                 bean(),
                 bean<EnrollmentPaymentPendingProperties>().expiresIn,
@@ -61,8 +68,10 @@ class ServiceBeanRegistrar :
         }
         registerBean<EnrollmentUseCase> {
             EnrollmentService(
-                bean(),
-                bean(),
+                bean<EnrollmentRepositoryReader>(),
+                bean<EnrollmentRepositoryWriter>(),
+                bean<EnrollmentWaitlistRepositoryReader>(),
+                bean<EnrollmentWaitlistRepositoryWriter>(),
             )
         }
         registerBean<EnrollmentWaitlistProcessor> {
@@ -73,8 +82,11 @@ class ServiceBeanRegistrar :
                 bean<EnrollmentPaymentPendingProperties>().expiresIn,
             )
         }
-        registerBean<EnrollmentWaitlistCoordinator> {
-            EnrollmentWaitlistCoordinator(
+        registerBean<EnrollmentWaitlistRepositoryReader> {
+            EnrollmentWaitlistRepositoryReader(bean())
+        }
+        registerBean<EnrollmentWaitlistRepositoryWriter> {
+            EnrollmentWaitlistRepositoryWriter(
                 bean(),
                 bean(),
             )
@@ -92,14 +104,8 @@ class ServiceBeanRegistrar :
             )
         }
 
-        registerBean<MemberRegistrationProcessor> {
-            MemberRegistrationProcessor(
-                bean(),
-                bean(),
-            )
-        }
-        registerBean<MemberSessionProcessor> {
-            MemberSessionProcessor(
+        registerBean<MemberAuthRepositoryWriter> {
+            MemberAuthRepositoryWriter(
                 bean(),
                 bean(),
                 bean(),
@@ -110,14 +116,13 @@ class ServiceBeanRegistrar :
                 bean(),
             )
         }
-        registerBean<MemberCurrentMemberProcessor> {
-            MemberCurrentMemberProcessor(bean())
+        registerBean<MemberRepositoryReader> {
+            MemberRepositoryReader(bean())
         }
         registerBean<MemberAuthUseCase> {
             MemberAuthService(
-                bean<MemberRegistrationProcessor>(),
-                bean<MemberSessionProcessor>(),
-                bean<MemberCurrentMemberProcessor>(),
+                bean<MemberAuthRepositoryWriter>(),
+                bean<MemberRepositoryReader>(),
             )
         }
 

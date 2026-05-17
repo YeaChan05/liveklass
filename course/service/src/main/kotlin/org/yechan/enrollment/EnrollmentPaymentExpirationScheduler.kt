@@ -21,15 +21,15 @@ open class EnrollmentPaymentExpirationScheduler(
 }
 
 open class EnrollmentPaymentExpirationService(
-    private val enrollmentRepository: EnrollmentRepository,
+    private val enrollmentReader: EnrollmentReader,
     private val enrollmentExpirationProcessor: EnrollmentExpirationProcessor,
-    private val waitlistCoordinator: EnrollmentWaitlistCoordinator,
+    private val waitlistWriter: EnrollmentWaitlistWriter,
     private val clock: Clock,
 ) : EnrollmentPaymentExpirationUseCase {
     override fun expirePaymentPendingEnrollments() {
         val now = LocalDateTime.now(clock)
         val targets =
-            enrollmentRepository.findExpiredPaymentPendingTargets(now = now, limit = 100)
+            enrollmentReader.findExpiredPaymentPendingTargets(now = now, limit = 100)
 
         if (targets.isEmpty()) {
             return
@@ -43,7 +43,7 @@ open class EnrollmentPaymentExpirationService(
 
         val expiredCount = countsByCourseId.values.sum()
         countsByCourseId.forEach { (courseId, expiredCount) ->
-            waitlistCoordinator.promoteAfterSeatRelease(courseId, expiredCount)
+            waitlistWriter.promoteAfterSeatRelease(courseId, expiredCount)
         }
 
         if (expiredCount > 0) {
