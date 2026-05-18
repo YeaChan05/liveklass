@@ -5,23 +5,23 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
 import java.time.LocalDateTime
 
-data class EnrollmentWaitlistPromotionCandidate(
+data class EnrollmentWaitlistAssignmentCandidate(
     val waitlist: EnrollmentWaitlistEntry,
     val assignedAt: LocalDateTime,
 )
 
 interface EnrollmentWaitlistAssigner {
-    fun assign(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistAssignResult
+    fun assign(candidate: EnrollmentWaitlistAssignmentCandidate): EnrollmentWaitlistAssignResult
 }
 
-open class EnrollmentWaitlistPromotionService(
+open class EnrollmentWaitlistAssignmentService(
     private val courseBulkWriter: CourseBulkWriter,
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
     private val enrollmentRepository: EnrollmentRepository,
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) : EnrollmentWaitlistAssigner {
     @Transactional
-    override fun assign(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistAssignResult {
+    override fun assign(candidate: EnrollmentWaitlistAssignmentCandidate): EnrollmentWaitlistAssignResult {
         val waitlist = candidate.waitlist
         val enrollmentsByCourseAndMember = enrollmentRepository.findAllByCourseIdsAndMemberIds(
             courseIds = setOf(waitlist.courseId),
@@ -37,7 +37,7 @@ open class EnrollmentWaitlistPromotionService(
         courseBulkWriter.reserveSeatsBulk(mapOf(assignable.courseId to 1))
         enrollmentBulkWriter.saveAllBulk(listOf(assignable))
 
-        return EnrollmentWaitlistAssignResult.Promoted
+        return EnrollmentWaitlistAssignResult.Assigned
     }
 
     private fun EnrollmentWaitlistEntry.toAssignableEnrollment(
@@ -67,7 +67,7 @@ open class EnrollmentWaitlistPromotionService(
 }
 
 enum class EnrollmentWaitlistAssignResult {
-    Promoted,
+    Assigned,
     Invalid,
 }
 

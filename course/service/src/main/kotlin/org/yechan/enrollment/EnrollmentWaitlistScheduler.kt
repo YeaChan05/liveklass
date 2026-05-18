@@ -3,25 +3,25 @@ package org.yechan.enrollment
 import org.springframework.scheduling.annotation.Scheduled
 import org.yechan.course.CourseReader
 
-interface WaitlistPromotionRecoveryUseCase {
-    fun recoverPromotions()
+interface WaitlistAssignmentRecoveryUseCase {
+    fun recoverAssignments()
 }
 
 open class EnrollmentWaitlistScheduler(
-    private val waitlistPromotionRecoveryService: WaitlistPromotionRecoveryUseCase,
+    private val waitlistAssignmentRecoveryService: WaitlistAssignmentRecoveryUseCase,
 ) {
     @Scheduled(fixedDelay = 5_000)
     fun processWaitlists() {
-        waitlistPromotionRecoveryService.recoverPromotions()
+        waitlistAssignmentRecoveryService.recoverAssignments()
     }
 }
 
-class WaitlistPromotionRecoveryService(
+class WaitlistAssignmentRecoveryService(
     private val waitlistReader: EnrollmentWaitlistReader,
     private val courseReader: CourseReader,
     private val waitlistWriter: EnrollmentWaitlistWriter,
-) : WaitlistPromotionRecoveryUseCase {
-    override fun recoverPromotions() {
+) : WaitlistAssignmentRecoveryUseCase {
+    override fun recoverAssignments() {
         val courseIds = waitlistReader.findCourseIds().ifEmpty { return }
 
         val courses = courseReader.getOpenedCoursesByIds(courseIds)

@@ -18,11 +18,11 @@ import org.yechan.enrollment.EnrollmentRepositoryWriter
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentUseCase
 import org.yechan.enrollment.EnrollmentWaitlistAssigner
-import org.yechan.enrollment.EnrollmentWaitlistPromotionService
+import org.yechan.enrollment.EnrollmentWaitlistAssignmentService
 import org.yechan.enrollment.EnrollmentWaitlistRepositoryReader
 import org.yechan.enrollment.EnrollmentWaitlistRepositoryWriter
 import org.yechan.enrollment.EnrollmentWaitlistScheduler
-import org.yechan.enrollment.WaitlistPromotionRecoveryService
+import org.yechan.enrollment.WaitlistAssignmentRecoveryService
 import org.yechan.member.MemberAuthRepositoryWriter
 import org.yechan.member.MemberAuthService
 import org.yechan.member.MemberAuthUseCase
@@ -75,7 +75,7 @@ class ServiceBeanRegistrar :
             )
         }
         registerBean<EnrollmentWaitlistAssigner> {
-            EnrollmentWaitlistPromotionService(
+            EnrollmentWaitlistAssignmentService(
                 bean(),
                 bean(),
                 bean(),
@@ -91,8 +91,8 @@ class ServiceBeanRegistrar :
                 bean(),
             )
         }
-        registerBean<WaitlistPromotionRecoveryService> {
-            WaitlistPromotionRecoveryService(
+        registerBean<WaitlistAssignmentRecoveryService> {
+            WaitlistAssignmentRecoveryService(
                 bean(),
                 bean(),
                 bean(),
@@ -100,7 +100,7 @@ class ServiceBeanRegistrar :
         }
         registerBean<EnrollmentWaitlistScheduler> {
             EnrollmentWaitlistScheduler(
-                bean<WaitlistPromotionRecoveryService>(),
+                bean<WaitlistAssignmentRecoveryService>(),
             )
         }
 

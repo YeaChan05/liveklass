@@ -76,7 +76,7 @@ class EnrollmentWaitlistRepositoryWriter(
         while (true) {
             val waitlist = waitlistRepository.peek(courseId) ?: return
             val result = enrollmentWaitlistAssigner.assign(
-                EnrollmentWaitlistPromotionCandidate(
+                EnrollmentWaitlistAssignmentCandidate(
                     waitlist = waitlist,
                     assignedAt = LocalDateTime.now(),
                 ),
@@ -84,7 +84,7 @@ class EnrollmentWaitlistRepositoryWriter(
 
             waitlistRepository.remove(courseId, waitlist.memberId)
 
-            if (result == EnrollmentWaitlistAssignResult.Promoted) {
+            if (result == EnrollmentWaitlistAssignResult.Assigned) {
                 return
             }
         }

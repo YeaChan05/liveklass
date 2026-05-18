@@ -36,8 +36,8 @@ class EnrollmentWaitlistSchedulerTest {
         EnrollmentRepositoryReader(courseRepository, enrollmentRepository)
     private val enrollmentWriter =
         EnrollmentRepositoryWriter(courseRepository, enrollmentRepository)
-    private val enrollmentWaitlistProcessor =
-        EnrollmentWaitlistPromotionService(
+    private val enrollmentWaitlistAssigner =
+        EnrollmentWaitlistAssignmentService(
             courseBulkWriter,
             enrollmentRepository,
             enrollmentRepository,
@@ -47,11 +47,11 @@ class EnrollmentWaitlistSchedulerTest {
     private val waitlistWriter =
         EnrollmentWaitlistRepositoryWriter(
             waitlistRepository,
-            enrollmentWaitlistProcessor,
+            enrollmentWaitlistAssigner,
         )
     private val enrollmentService =
         EnrollmentService(enrollmentReader, enrollmentWriter, waitlistReader, waitlistWriter)
-    private val recoveryService = WaitlistPromotionRecoveryService(
+    private val recoveryService = WaitlistAssignmentRecoveryService(
         waitlistReader,
         CourseRepositoryReader(courseRepository),
         waitlistWriter,
@@ -59,7 +59,7 @@ class EnrollmentWaitlistSchedulerTest {
 
     @Test
     fun `대기열 보정 스케줄러는 전용 서비스만 호출한다`() {
-        val recoveryService = RecordingWaitlistPromotionRecoveryUseCase()
+        val recoveryService = RecordingWaitlistAssignmentRecoveryUseCase()
         val scheduler = EnrollmentWaitlistScheduler(recoveryService)
 
         scheduler.processWaitlists()
@@ -78,7 +78,7 @@ class EnrollmentWaitlistSchedulerTest {
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val enrollments =
@@ -106,7 +106,7 @@ class EnrollmentWaitlistSchedulerTest {
             requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
         )
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val enrollments = enrollmentRepository.enrollments.values
@@ -146,7 +146,7 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val changedCourse = courseService.getCourse(course.courseId)
         val assignedEnrollments =
@@ -181,7 +181,7 @@ class EnrollmentWaitlistSchedulerTest {
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
 
-        val failingProcessor = EnrollmentWaitlistPromotionService(
+        val failingAssigner = EnrollmentWaitlistAssignmentService(
             object : CourseBulkWriter {
                 override fun reserveSeatsBulk(courseIds: Map<Long, Int>): Unit = throw IllegalStateException("좌석 예약 실패")
 
@@ -190,13 +190,13 @@ class EnrollmentWaitlistSchedulerTest {
             enrollmentRepository,
             enrollmentRepository,
         )
-        val failingRecoveryService = WaitlistPromotionRecoveryService(
+        val failingRecoveryService = WaitlistAssignmentRecoveryService(
             waitlistReader,
             CourseRepositoryReader(courseRepository),
-            EnrollmentWaitlistRepositoryWriter(waitlistRepository, failingProcessor),
+            EnrollmentWaitlistRepositoryWriter(waitlistRepository, failingAssigner),
         )
 
-        assertThatThrownBy { failingRecoveryService.recoverPromotions() }
+        assertThatThrownBy { failingRecoveryService.recoverAssignments() }
             .isInstanceOf(IllegalStateException::class.java)
 
         assertThat(waitlistRepository.findByMemberId(2L)).hasSize(1)
@@ -218,7 +218,7 @@ class EnrollmentWaitlistSchedulerTest {
         waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
         waitlistRepository.markSoldOut(course.courseId)
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val assigned = enrollmentRepository.enrollments.values.single { it.memberId == 3L }
 
@@ -251,19 +251,19 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
-        val customProcessor = EnrollmentWaitlistPromotionService(
+        val customAssigner = EnrollmentWaitlistAssignmentService(
             courseBulkWriter,
             enrollmentRepository,
             enrollmentRepository,
             Duration.ofMinutes(3),
         )
-        val customRecoveryService = WaitlistPromotionRecoveryService(
+        val customRecoveryService = WaitlistAssignmentRecoveryService(
             waitlistReader,
             CourseRepositoryReader(courseRepository),
-            EnrollmentWaitlistRepositoryWriter(waitlistRepository, customProcessor),
+            EnrollmentWaitlistRepositoryWriter(waitlistRepository, customAssigner),
         )
 
-        customRecoveryService.recoverPromotions()
+        customRecoveryService.recoverAssignments()
 
         val assignedEnrollment = enrollmentRepository.enrollments.values.first { it.memberId == 3L }
 
@@ -292,7 +292,7 @@ class EnrollmentWaitlistSchedulerTest {
         )
         waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val reactivatedEnrollment =
             enrollmentRepository.findById(requireNotNull(expiredEnrollment.enrollmentId))
@@ -319,7 +319,7 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
 
-        recoveryService.recoverPromotions()
+        recoveryService.recoverAssignments()
 
         val changedCourse = courseRepository.findById(course.courseId!!)
 
@@ -327,11 +327,11 @@ class EnrollmentWaitlistSchedulerTest {
         assertThat(enrollmentRepository.findByMemberId(1L)).isEmpty()
     }
 
-    private class RecordingWaitlistPromotionRecoveryUseCase : WaitlistPromotionRecoveryUseCase {
+    private class RecordingWaitlistAssignmentRecoveryUseCase : WaitlistAssignmentRecoveryUseCase {
         var callCount = 0
             private set
 
-        override fun recoverPromotions() {
+        override fun recoverAssignments() {
             callCount++
         }
     }

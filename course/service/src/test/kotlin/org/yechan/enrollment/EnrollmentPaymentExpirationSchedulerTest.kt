@@ -40,7 +40,7 @@ class EnrollmentPaymentExpirationSchedulerTest {
     private val waitlistWriter =
         EnrollmentWaitlistRepositoryWriter(
             waitlistRepository,
-            EnrollmentWaitlistPromotionService(
+            EnrollmentWaitlistAssignmentService(
                 courseRepository,
                 enrollmentRepository,
                 enrollmentRepository,
