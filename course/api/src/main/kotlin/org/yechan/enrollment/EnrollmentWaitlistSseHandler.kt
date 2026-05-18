@@ -1,11 +1,9 @@
 package org.yechan.enrollment
 
-import org.springframework.stereotype.Component
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.io.IOException
 import java.time.Instant
 
-@Component
 class EnrollmentWaitlistSseHandler(
     private val enrollmentUseCase: EnrollmentUseCase,
 ) {

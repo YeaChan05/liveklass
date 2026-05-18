@@ -184,7 +184,6 @@ class EnrollmentControllerTest @Autowired constructor(
     @Import(
         CourseAuthorizationPolicy::class,
         EnrollmentController::class,
-        EnrollmentWaitlistSseHandler::class,
     )
     class TestApplication
 
