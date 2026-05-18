@@ -7,5 +7,5 @@ org.yechan.member.MemberAuthOpenEndpointPolicy
 org.yechan.course.CourseOpenEndpointPolicy
 org.yechan.course.CourseAuthorizationPolicy
 org.yechan.course.CourseRoleHierarchyConfiguration
-org.yechan.enrollment.EnrollmentApiAutoConfiguration
+org.yechan.enrollment.EnrollmentApiConfiguration
 org.yechan.enrollment.EnrollmentAuthorizationPolicy
