@@ -3,14 +3,6 @@ package org.yechan.enrollment
 import java.time.Instant
 import java.time.LocalDateTime
 
-interface EnrollmentWaitlistReader {
-    fun isWaitlistMode(courseId: Long): Boolean
-
-    fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry>
-
-    fun findCourseIds(): Set<Long>
-}
-
 interface EnrollmentWaitlistWriter {
     fun enableWaitlistMode(courseId: Long)
 
@@ -31,16 +23,6 @@ interface EnrollmentWaitlistWriter {
         courseId: Long,
         returnedSeatCount: Int = 1,
     )
-}
-
-class EnrollmentWaitlistRepositoryReader(
-    private val waitlistRepository: EnrollmentWaitlistRepository,
-) : EnrollmentWaitlistReader {
-    override fun isWaitlistMode(courseId: Long): Boolean = waitlistRepository.isSoldOut(courseId)
-
-    override fun findByMemberId(memberId: Long): List<EnrollmentWaitlistEntry> = waitlistRepository.findByMemberId(memberId)
-
-    override fun findCourseIds(): Set<Long> = waitlistRepository.findCourseIds()
 }
 
 class EnrollmentWaitlistRepositoryWriter(
