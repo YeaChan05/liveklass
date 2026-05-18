@@ -39,8 +39,8 @@ class EnrollmentService(
         }
 
         return when (val result = enrollmentWriter.enroll(command)) {
-            is EnrollmentEnrollTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
-            EnrollmentEnrollTransactionResult.SoldOut -> joinWaitlistAfterSeatReservationFailed(courseId, memberId)
+            is EnrollmentTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
+            EnrollmentTransactionResult.SoldOut -> joinWaitlistAfterSeatReservationFailed(courseId, memberId)
         }
     }
 

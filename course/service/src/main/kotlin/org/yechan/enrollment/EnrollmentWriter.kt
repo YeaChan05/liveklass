@@ -2,53 +2,13 @@ package org.yechan.enrollment
 
 import org.springframework.transaction.annotation.Transactional
 import org.yechan.course.CourseInvalidStateException
-import org.yechan.course.CourseNotFoundException
 import org.yechan.course.CourseRepository
 import org.yechan.course.EnrollmentNotFoundException
 import java.time.Duration
 import java.time.LocalDateTime
 
-@Transactional(readOnly = true)
-class EnrollmentRepositoryReader(
-    private val courseRepository: CourseRepository,
-    private val enrollmentRepository: EnrollmentRepository,
-) : EnrollmentReader {
-    override fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo? = enrollmentRepository.findByMemberIdAndCourseId(
-        memberId = command.memberId,
-        courseId = command.courseId,
-    )?.takeIf(EnrollmentModel::isSeatOccupied)
-        ?.toResult()
-
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository
-        .findHistoriesByMemberId(memberId)
-        .map { it.toResult() }
-
-    override fun requireOpenCourse(courseId: Long) {
-        val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()
-        course.validateIsOpen()
-    }
-
-    override fun findExpiredPaymentPendingTargets(
-        now: LocalDateTime,
-        limit: Int,
-    ): List<EnrollmentExpirationTarget> = enrollmentRepository.findExpiredPaymentPendingTargets(now = now, limit = limit)
-}
-
-interface EnrollmentReader {
-    fun findSeatOccupyingEnrollment(command: EnrollCourseCommand): EnrollmentInfo?
-
-    fun getMyEnrollments(memberId: Long): List<EnrollmentInfo>
-
-    fun requireOpenCourse(courseId: Long)
-
-    fun findExpiredPaymentPendingTargets(
-        now: LocalDateTime,
-        limit: Int,
-    ): List<EnrollmentExpirationTarget>
-}
-
 interface EnrollmentWriter {
-    fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult
+    fun enroll(command: EnrollCourseCommand): EnrollmentTransactionResult
 
     fun confirmEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo
 
@@ -62,7 +22,7 @@ class EnrollmentRepositoryWriter(
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
 ) : EnrollmentWriter {
     @Transactional
-    override fun enroll(command: EnrollCourseCommand): EnrollmentEnrollTransactionResult {
+    override fun enroll(command: EnrollCourseCommand): EnrollmentTransactionResult {
         val memberId = command.memberId
         val courseId = command.courseId
         val now = LocalDateTime.now()
@@ -77,7 +37,7 @@ class EnrollmentRepositoryWriter(
             return when (enrollment.status) {
                 EnrollmentStatus.PENDING,
                 EnrollmentStatus.CONFIRMED,
-                -> EnrollmentEnrollTransactionResult.Enrolled(
+                -> EnrollmentTransactionResult.Enrolled(
                     enrollment.toResult(),
                 )
 
@@ -142,9 +102,9 @@ class EnrollmentRepositoryWriter(
         courseId: Long,
         memberId: Long,
         now: LocalDateTime,
-    ): EnrollmentEnrollTransactionResult {
+    ): EnrollmentTransactionResult {
         if (!courseRepository.reserveSeatIfAvailable(courseId)) {
-            return EnrollmentEnrollTransactionResult.SoldOut
+            return EnrollmentTransactionResult.SoldOut
         }
 
         val renewedEnrollment =
@@ -155,7 +115,7 @@ class EnrollmentRepositoryWriter(
                 now = now,
             )
 
-        return EnrollmentEnrollTransactionResult.Enrolled(
+        return EnrollmentTransactionResult.Enrolled(
             renewedEnrollment.toResult(),
         )
     }
@@ -164,9 +124,9 @@ class EnrollmentRepositoryWriter(
         courseId: Long,
         memberId: Long,
         now: LocalDateTime,
-    ): EnrollmentEnrollTransactionResult {
+    ): EnrollmentTransactionResult {
         if (!courseRepository.reserveSeatIfAvailable(courseId)) {
-            return EnrollmentEnrollTransactionResult.SoldOut
+            return EnrollmentTransactionResult.SoldOut
         }
 
         val enrollment =
@@ -176,7 +136,7 @@ class EnrollmentRepositoryWriter(
                 now = now,
             )
 
-        return EnrollmentEnrollTransactionResult.Enrolled(
+        return EnrollmentTransactionResult.Enrolled(
             enrollment.toResult(),
         )
     }
@@ -188,23 +148,3 @@ class EnrollmentRepositoryWriter(
         ?.takeIf { it.memberId == memberId }
         ?: throw EnrollmentNotFoundException()
 }
-
-internal fun EnrollmentModel.toResult(): EnrollmentInfo = EnrollmentInfo(
-    enrollmentId = requireNotNull(enrollmentId),
-    courseId = courseId,
-    memberId = memberId,
-    status = status,
-)
-
-sealed interface EnrollmentEnrollTransactionResult {
-    data class Enrolled(
-        val enrollment: EnrollmentInfo,
-    ) : EnrollmentEnrollTransactionResult
-
-    data object SoldOut : EnrollmentEnrollTransactionResult
-}
-
-data class EnrollmentCancelResult(
-    val enrollment: EnrollmentInfo,
-    val courseId: Long,
-)

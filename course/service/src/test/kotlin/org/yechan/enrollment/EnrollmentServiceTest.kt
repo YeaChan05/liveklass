@@ -765,7 +765,7 @@ class EnrollmentServiceTest {
             EnrollCourseCommand(memberId = 2L, courseId = course.courseId),
         )
 
-        val result = (enrolled as EnrollmentEnrollTransactionResult.Enrolled).enrollment
+        val result = (enrolled as EnrollmentTransactionResult.Enrolled).enrollment
         val saved =
             enrollmentRepository.findById(result.enrollmentId) ?: error("missing enrollment")
 
