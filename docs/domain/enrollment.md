@@ -30,6 +30,8 @@
 - `CONFIRMED` 상태는 좌석을 점유합니다.
 - `CANCELLED` 상태는 좌석을 점유하지 않습니다.
 - `EXPIRED` 상태는 좌석을 점유하지 않습니다.
+- 사용자의 수강 신청 내역 조회에는 `CONFIRMED`, `CANCELLED` 상태만 노출합니다.
+- `PENDING`은 결제 대기 중인 현재 처리 상태이고, `EXPIRED`는 내부 만료 처리 상태이므로 수강 신청 내역에 노출하지 않습니다.
 - `PENDING` 상태는 `CONFIRMED` 상태로 변경될 수 있습니다.
 - `PENDING` 상태는 `CANCELLED` 상태로 변경될 수 있습니다.
 - `PENDING` 상태는 결제 대기 시간이 지나면 `EXPIRED` 상태로 변경될 수 있습니다.
@@ -59,7 +61,18 @@
 - `expirePaymentPending()`
 - `isPaymentPendingExpired()`
 - `isSeatOccupied()`
-- `isPendingOrConfirmed()`
+- `isVisibleInMyEnrollmentHistory()`
+
+---
+
+## 저장 설계
+
+- 수강 신청은 `enrollments` 테이블에 저장합니다.
+- 확정된 신청도 별도 테이블이 아니라 같은 `enrollments` row의 `status = CONFIRMED`로 저장합니다.
+- 사용자 취소는 `status = CANCELLED`로 저장합니다.
+- 같은 회원과 강의 조합은 `course_id`, `member_id`로 식별하며 한 row만 유지합니다.
+- 테이블 간 FK는 만들지 않고 `course_id`, `member_id` 식별자만 저장합니다.
+- 사용자 수강 신청 내역 조회는 `member_id`, `status` 기준으로 `CONFIRMED`, `CANCELLED`만 조회합니다.
 
 ---
 

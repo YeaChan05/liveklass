@@ -145,17 +145,33 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `내 수강 신청 목록을 조회한다`() {
+    fun `내 수강 신청 목록은 확정과 취소 상태만 조회한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
-        val course = courseService.createCourse(createCourseCommand(), 1L)
-        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
-        service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        val pendingCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val confirmedCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val cancelledCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val expiredCourse = courseService.createCourse(createCourseCommand(), 1L)
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = pendingCourse.courseId, memberId = 2L, status = EnrollmentStatus.PENDING),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = confirmedCourse.courseId, memberId = 2L, status = EnrollmentStatus.CONFIRMED),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = cancelledCourse.courseId, memberId = 2L, status = EnrollmentStatus.CANCELLED),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = expiredCourse.courseId, memberId = 2L, status = EnrollmentStatus.EXPIRED),
+        )
 
         val enrollments = service.getMyEnrollments(2L)
 
-        assertThat(enrollments.size).isEqualTo(1)
-        assertThat(enrollments.single().memberId).isEqualTo(2L)
+        assertThat(enrollments.map(EnrollmentInfo::status))
+            .containsExactlyInAnyOrder(EnrollmentStatus.CONFIRMED, EnrollmentStatus.CANCELLED)
+        assertThat(enrollments).allSatisfy { enrollment ->
+            assertThat(enrollment.memberId).isEqualTo(2L)
+        }
     }
 
     @Test
@@ -544,10 +560,13 @@ class EnrollmentServiceTest {
             ),
         )
 
-        val promoted = service.getMyEnrollments(3L).single()
+        val promoted = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = 3L,
+            courseId = course.courseId,
+        )
         val changedCourse = courseService.getCourse(course.courseId)
 
-        assertThat(promoted.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(promoted?.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(changedCourse.seatLeftCount).isEqualTo(0)
         assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
         assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
@@ -571,7 +590,12 @@ class EnrollmentServiceTest {
             ),
         )
 
-        assertThat(service.getMyEnrollments(3L).single().status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(
+            enrollmentRepository.findByMemberIdAndCourseId(
+                memberId = 3L,
+                courseId = course.courseId,
+            )?.status,
+        ).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
     }

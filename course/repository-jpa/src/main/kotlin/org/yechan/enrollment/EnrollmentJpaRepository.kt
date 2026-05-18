@@ -10,6 +10,11 @@ import java.time.LocalDateTime
 interface EnrollmentJpaRepository : JpaRepository<EnrollmentEntity, Long> {
     fun findAllByMemberId(memberId: Long): List<EnrollmentEntity>
 
+    fun findAllByMemberIdAndStatusIn(
+        memberId: Long,
+        statuses: Collection<EnrollmentStatus>,
+    ): List<EnrollmentEntity>
+
     fun findByMemberIdAndCourseId(
         memberId: Long,
         courseId: Long,

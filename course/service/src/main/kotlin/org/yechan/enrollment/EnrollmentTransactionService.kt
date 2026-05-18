@@ -19,7 +19,9 @@ class EnrollmentRepositoryReader(
     )?.takeIf(EnrollmentModel::isSeatOccupied)
         ?.toResult()
 
-    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository.findByMemberId(memberId).map { it.toResult() }
+    override fun getMyEnrollments(memberId: Long): List<EnrollmentInfo> = enrollmentRepository
+        .findHistoriesByMemberId(memberId)
+        .map { it.toResult() }
 
     override fun requireOpenCourse(courseId: Long) {
         val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()

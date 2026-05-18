@@ -201,6 +201,10 @@ class FakeEnrollmentRepository :
 
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.values.filter { it.memberId == memberId }
 
+    override fun findHistoriesByMemberId(memberId: Long): List<EnrollmentModel> = enrollments.values.filter {
+        it.memberId == memberId && it.isVisibleInMyEnrollmentHistory()
+    }
+
     override fun findByMemberIdAndCourseId(
         memberId: Long,
         courseId: Long,

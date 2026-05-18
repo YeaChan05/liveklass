@@ -10,6 +10,8 @@ interface EnrollmentRepository {
 
     fun findByMemberId(memberId: Long): List<EnrollmentModel>
 
+    fun findHistoriesByMemberId(memberId: Long): List<EnrollmentModel>
+
     fun findByMemberIdAndCourseId(
         memberId: Long,
         courseId: Long,

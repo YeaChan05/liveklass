@@ -22,6 +22,13 @@ class EnrollmentRepositoryImpl(
     override fun findByMemberId(memberId: Long): List<EnrollmentModel> = enrollmentJpaRepository.findAllByMemberId(memberId)
         .map(EnrollmentEntity::toDomain)
 
+    override fun findHistoriesByMemberId(memberId: Long): List<EnrollmentModel> = enrollmentJpaRepository
+        .findAllByMemberIdAndStatusIn(
+            memberId = memberId,
+            statuses = EnrollmentStatus.myEnrollmentHistoryStatuses(),
+        )
+        .map(EnrollmentEntity::toDomain)
+
     override fun findByMemberIdAndCourseId(
         memberId: Long,
         courseId: Long,

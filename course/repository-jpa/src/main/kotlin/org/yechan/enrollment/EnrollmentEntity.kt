@@ -25,6 +25,10 @@ import java.time.LocalDateTime
             columnList = "member_id",
         ),
         Index(
+            name = "idx_enrollments_member_status",
+            columnList = "member_id, status",
+        ),
+        Index(
             name = "idx_enrollments_course_status",
             columnList = "course_id, status",
         ),

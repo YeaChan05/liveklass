@@ -108,6 +108,48 @@ class EnrollmentRepositoryImplTest {
     }
 
     @Test
+    fun `회원 수강 신청 내역 조회는 확정과 취소 상태만 반환한다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val pendingCourse = persistCourse(creator)
+        val confirmedCourse = persistCourse(creator)
+        val cancelledCourse = persistCourse(creator)
+        val expiredCourse = persistCourse(creator)
+        enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = pendingCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        val confirmed = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = confirmedCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.CONFIRMED,
+            ),
+        )
+        val cancelled = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = cancelledCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.CANCELLED,
+            ),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = expiredCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val histories = enrollmentRepository.findHistoriesByMemberId(member.id!!)
+
+        assertThat(histories).containsExactlyInAnyOrder(confirmed, cancelled)
+    }
+
+    @Test
     fun `회원은 서로 다른 강의에 각각 신청할 수 있다`() {
         val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
         val member = persistMember(email = "student@example.com")

@@ -56,6 +56,7 @@ CREATE TABLE enrollments (
         UNIQUE (course_id, member_id),
 
     INDEX idx_enrollments_member_id (member_id),
+    INDEX idx_enrollments_member_status (member_id, status),
     INDEX idx_enrollments_course_status (course_id, status),
     INDEX idx_enrollments_status_payment_pending_expires_at (status, payment_pending_expires_at)
 );

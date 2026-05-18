@@ -68,6 +68,8 @@ interface EnrollmentModel :
 
     fun isSeatOccupied(): Boolean = status == EnrollmentStatus.PENDING ||
         status == EnrollmentStatus.CONFIRMED
+
+    fun isVisibleInMyEnrollmentHistory(): Boolean = status.isVisibleInMyEnrollmentHistory()
 }
 
 data class EnrollmentModelData(
@@ -90,4 +92,14 @@ enum class EnrollmentStatus {
     CONFIRMED,
     CANCELLED,
     EXPIRED,
+    ;
+
+    fun isVisibleInMyEnrollmentHistory(): Boolean = this in myEnrollmentHistoryStatuses()
+
+    companion object {
+        fun myEnrollmentHistoryStatuses(): Set<EnrollmentStatus> = setOf(
+            CONFIRMED,
+            CANCELLED,
+        )
+    }
 }
