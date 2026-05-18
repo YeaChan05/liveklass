@@ -43,7 +43,7 @@ open class EnrollmentPaymentExpirationService(
 
         val expiredCount = countsByCourseId.values.sum()
         countsByCourseId.forEach { (courseId, expiredCount) ->
-            waitlistWriter.promoteAfterSeatRelease(courseId, expiredCount)
+            waitlistWriter.assignAfterSeatRelease(courseId, expiredCount)
         }
 
         if (expiredCount > 0) {

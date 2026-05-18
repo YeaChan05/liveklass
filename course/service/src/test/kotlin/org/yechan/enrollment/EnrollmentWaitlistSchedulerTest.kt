@@ -149,7 +149,7 @@ class EnrollmentWaitlistSchedulerTest {
         recoveryService.recoverPromotions()
 
         val changedCourse = courseService.getCourse(course.courseId)
-        val promotedEnrollments =
+        val assignedEnrollments =
             enrollmentRepository.enrollments.values.filter { it.memberId == 3L }
 
         assertThat(firstWaitlisted).isEqualTo(
@@ -165,8 +165,8 @@ class EnrollmentWaitlistSchedulerTest {
             ),
         )
         assertThat(changedCourse.seatLeftCount).isEqualTo(0)
-        assertThat(promotedEnrollments).hasSize(1)
-        assertThat(promotedEnrollments.single().status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(assignedEnrollments).hasSize(1)
+        assertThat(assignedEnrollments.single().status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
     }
 
@@ -220,9 +220,9 @@ class EnrollmentWaitlistSchedulerTest {
 
         recoveryService.recoverPromotions()
 
-        val promoted = enrollmentRepository.enrollments.values.single { it.memberId == 3L }
+        val assigned = enrollmentRepository.enrollments.values.single { it.memberId == 3L }
 
-        assertThat(promoted.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(assigned.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(waitlistRepository.findByMemberId(2L)).isEmpty()
         assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
@@ -265,12 +265,12 @@ class EnrollmentWaitlistSchedulerTest {
 
         customRecoveryService.recoverPromotions()
 
-        val promotedEnrollment = enrollmentRepository.enrollments.values.first { it.memberId == 3L }
+        val assignedEnrollment = enrollmentRepository.enrollments.values.first { it.memberId == 3L }
 
         assertThat(
             Duration.between(
-                promotedEnrollment.paymentPendingStartedAt,
-                promotedEnrollment.paymentPendingExpiresAt,
+                assignedEnrollment.paymentPendingStartedAt,
+                assignedEnrollment.paymentPendingExpiresAt,
             ),
         )
             .isEqualTo(Duration.ofMinutes(3))

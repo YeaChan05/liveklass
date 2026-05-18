@@ -17,7 +17,7 @@ import org.yechan.enrollment.EnrollmentRepositoryReader
 import org.yechan.enrollment.EnrollmentRepositoryWriter
 import org.yechan.enrollment.EnrollmentService
 import org.yechan.enrollment.EnrollmentUseCase
-import org.yechan.enrollment.EnrollmentWaitlistProcessor
+import org.yechan.enrollment.EnrollmentWaitlistAssigner
 import org.yechan.enrollment.EnrollmentWaitlistPromotionService
 import org.yechan.enrollment.EnrollmentWaitlistRepositoryReader
 import org.yechan.enrollment.EnrollmentWaitlistRepositoryWriter
@@ -74,7 +74,7 @@ class ServiceBeanRegistrar :
                 bean<EnrollmentWaitlistRepositoryWriter>(),
             )
         }
-        registerBean<EnrollmentWaitlistProcessor> {
+        registerBean<EnrollmentWaitlistAssigner> {
             EnrollmentWaitlistPromotionService(
                 bean(),
                 bean(),

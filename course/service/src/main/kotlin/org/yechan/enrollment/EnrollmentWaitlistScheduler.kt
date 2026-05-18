@@ -27,13 +27,13 @@ class WaitlistPromotionRecoveryService(
         val courses = courseReader.getOpenedCoursesByIds(courseIds)
         courses.forEach { course ->
             val courseId = course.courseId
-            val promotableCount = course.seatLeftCount
+            val assignableCount = course.seatLeftCount
 
-            if (promotableCount <= 0) {
+            if (assignableCount <= 0) {
                 return@forEach
             }
 
-            waitlistWriter.promoteAfterSeatRelease(courseId, promotableCount)
+            waitlistWriter.assignAfterSeatRelease(courseId, assignableCount)
         }
     }
 }

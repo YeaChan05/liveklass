@@ -48,7 +48,7 @@ class EnrollmentService(
 
     override fun cancelEnrollment(command: EnrollmentStatusCommand): EnrollmentInfo {
         val result = enrollmentWriter.cancelEnrollment(command)
-        waitlistWriter.promoteAfterSeatRelease(result.courseId)
+        waitlistWriter.assignAfterSeatRelease(result.courseId)
         return result.enrollment
     }
 

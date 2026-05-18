@@ -560,13 +560,13 @@ class EnrollmentServiceTest {
             ),
         )
 
-        val promoted = enrollmentRepository.findByMemberIdAndCourseId(
+        val assigned = enrollmentRepository.findByMemberIdAndCourseId(
             memberId = 3L,
             courseId = course.courseId,
         )
         val changedCourse = courseService.getCourse(course.courseId)
 
-        assertThat(promoted?.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(assigned?.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(changedCourse.seatLeftCount).isEqualTo(0)
         assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
         assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)

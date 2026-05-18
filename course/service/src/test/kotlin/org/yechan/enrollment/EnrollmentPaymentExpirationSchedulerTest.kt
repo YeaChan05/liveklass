@@ -140,13 +140,13 @@ class EnrollmentPaymentExpirationSchedulerTest {
 
         expirationService.expirePaymentPendingEnrollments()
 
-        val promoted = enrollmentRepository.findByMemberIdAndCourseId(
+        val assigned = enrollmentRepository.findByMemberIdAndCourseId(
             memberId = 3L,
             courseId = course.courseId,
         )
 
         assertThat(enrollmentRepository.findById(enrolled.enrollmentId)?.status).isEqualTo(EnrollmentStatus.EXPIRED)
-        assertThat(promoted?.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(assigned?.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(courseRepository.findById(course.courseId)?.seatLeftCount).isEqualTo(0)
         assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
         assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)

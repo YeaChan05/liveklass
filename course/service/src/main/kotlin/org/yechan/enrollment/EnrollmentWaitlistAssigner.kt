@@ -7,11 +7,11 @@ import java.time.LocalDateTime
 
 data class EnrollmentWaitlistPromotionCandidate(
     val waitlist: EnrollmentWaitlistEntry,
-    val promotedAt: LocalDateTime,
+    val assignedAt: LocalDateTime,
 )
 
-interface EnrollmentWaitlistProcessor {
-    fun promote(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistPromotionResult
+interface EnrollmentWaitlistAssigner {
+    fun assign(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistAssignResult
 }
 
 open class EnrollmentWaitlistPromotionService(
@@ -19,28 +19,28 @@ open class EnrollmentWaitlistPromotionService(
     private val enrollmentBulkWriter: EnrollmentBulkWriter,
     private val enrollmentRepository: EnrollmentRepository,
     private val paymentPendingExpiresIn: Duration = Duration.ofMinutes(10),
-) : EnrollmentWaitlistProcessor {
+) : EnrollmentWaitlistAssigner {
     @Transactional
-    override fun promote(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistPromotionResult {
+    override fun assign(candidate: EnrollmentWaitlistPromotionCandidate): EnrollmentWaitlistAssignResult {
         val waitlist = candidate.waitlist
         val enrollmentsByCourseAndMember = enrollmentRepository.findAllByCourseIdsAndMemberIds(
             courseIds = setOf(waitlist.courseId),
             memberIds = setOf(waitlist.memberId),
         ).associateBy { it.courseId to it.memberId }
 
-        val promotion = waitlist.toPromotableEnrollment(
+        val assignable = waitlist.toAssignableEnrollment(
             courseId = waitlist.courseId,
-            now = candidate.promotedAt,
+            now = candidate.assignedAt,
             existingEnrollment = enrollmentsByCourseAndMember[waitlist.courseId to waitlist.memberId],
-        ) ?: return EnrollmentWaitlistPromotionResult.Invalid
+        ) ?: return EnrollmentWaitlistAssignResult.Invalid
 
-        courseBulkWriter.reserveSeatsBulk(mapOf(promotion.courseId to 1))
-        enrollmentBulkWriter.saveAllBulk(listOf(promotion))
+        courseBulkWriter.reserveSeatsBulk(mapOf(assignable.courseId to 1))
+        enrollmentBulkWriter.saveAllBulk(listOf(assignable))
 
-        return EnrollmentWaitlistPromotionResult.Promoted
+        return EnrollmentWaitlistAssignResult.Promoted
     }
 
-    private fun EnrollmentWaitlistEntry.toPromotableEnrollment(
+    private fun EnrollmentWaitlistEntry.toAssignableEnrollment(
         courseId: Long,
         now: LocalDateTime,
         existingEnrollment: EnrollmentModel?,
@@ -66,7 +66,7 @@ open class EnrollmentWaitlistPromotionService(
     }
 }
 
-enum class EnrollmentWaitlistPromotionResult {
+enum class EnrollmentWaitlistAssignResult {
     Promoted,
     Invalid,
 }

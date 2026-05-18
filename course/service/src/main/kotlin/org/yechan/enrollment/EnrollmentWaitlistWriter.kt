@@ -19,7 +19,7 @@ interface EnrollmentWaitlistWriter {
         memberId: Long,
     )
 
-    fun promoteAfterSeatRelease(
+    fun assignAfterSeatRelease(
         courseId: Long,
         returnedSeatCount: Int = 1,
     )
@@ -27,7 +27,7 @@ interface EnrollmentWaitlistWriter {
 
 class EnrollmentWaitlistRepositoryWriter(
     private val waitlistRepository: EnrollmentWaitlistRepository,
-    private val enrollmentWaitlistProcessor: EnrollmentWaitlistProcessor,
+    private val enrollmentWaitlistAssigner: EnrollmentWaitlistAssigner,
 ) : EnrollmentWaitlistWriter {
     override fun enableWaitlistMode(courseId: Long) {
         waitlistRepository.markSoldOut(courseId)
@@ -56,13 +56,13 @@ class EnrollmentWaitlistRepositoryWriter(
         waitlistRepository.remove(courseId, memberId)
     }
 
-    override fun promoteAfterSeatRelease(
+    override fun assignAfterSeatRelease(
         courseId: Long,
         returnedSeatCount: Int,
     ) {
         try {
             repeat(returnedSeatCount.coerceAtLeast(0)) {
-                promoteOne(courseId)
+                assignOne(courseId)
             }
         } catch (e: RuntimeException) {
             updateSoldOutFlag(courseId)
@@ -72,19 +72,19 @@ class EnrollmentWaitlistRepositoryWriter(
         updateSoldOutFlag(courseId)
     }
 
-    private fun promoteOne(courseId: Long) {
+    private fun assignOne(courseId: Long) {
         while (true) {
             val waitlist = waitlistRepository.peek(courseId) ?: return
-            val result = enrollmentWaitlistProcessor.promote(
+            val result = enrollmentWaitlistAssigner.assign(
                 EnrollmentWaitlistPromotionCandidate(
                     waitlist = waitlist,
-                    promotedAt = LocalDateTime.now(),
+                    assignedAt = LocalDateTime.now(),
                 ),
             )
 
             waitlistRepository.remove(courseId, waitlist.memberId)
 
-            if (result == EnrollmentWaitlistPromotionResult.Promoted) {
+            if (result == EnrollmentWaitlistAssignResult.Promoted) {
                 return
             }
         }
