@@ -1,5 +1,7 @@
 package org.yechan;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -19,9 +21,9 @@ class LoginUserIdArgumentResolver implements HandlerMethodArgumentResolver {
     @Override
     public Object resolveArgument(
         MethodParameter parameter,
-        ModelAndViewContainer mavContainer,
+        @Nullable ModelAndViewContainer mavContainer,
         NativeWebRequest webRequest,
-        WebDataBinderFactory binderFactory
+        @Nullable WebDataBinderFactory binderFactory
     ) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {

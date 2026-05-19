@@ -38,7 +38,7 @@ class CommonApiBeanRegistrar implements BeanRegistrar {
                 public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
                     builder.configureMessageConvertersList(converters -> {
                         if (objectMapper != null && !linkProviders.isEmpty()) {
-                            converters.add(0, new ApiHateoasHttpMessageConverter(objectMapper, linkProviders));
+                            converters.addFirst(new ApiHateoasHttpMessageConverter(objectMapper, linkProviders));
                         }
                     });
                 }

@@ -17,7 +17,6 @@ import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import tools.jackson.databind.ObjectMapper;
 
-@NullMarked
 class ApiResponseHttpMessageConverter extends AbstractHttpMessageConverter<Object> {
 
   private final ObjectMapper objectMapper;
@@ -76,19 +75,17 @@ class ApiResponseHttpMessageConverter extends AbstractHttpMessageConverter<Objec
   }
 
   private String extractMessage(Object body) {
-    if (body instanceof String value) {
-      return value;
-    }
-    if (body instanceof CharSequence value) {
-      return value.toString();
-    }
-    if (body instanceof Throwable throwable) {
-      if (throwable.getMessage() != null) {
-        return throwable.getMessage();
+    return switch (body) {
+      case String value -> value;
+      case CharSequence value -> value.toString();
+      case Throwable throwable -> {
+        if (throwable.getMessage() != null) {
+          yield throwable.getMessage();
+        }
+        yield throwable.getClass().getSimpleName();
       }
-      return throwable.getClass().getSimpleName();
-    }
-    return String.valueOf(body);
+      default -> String.valueOf(body);
+    };
   }
 
   private int resolveStatusCode(HttpOutputMessage outputMessage) {

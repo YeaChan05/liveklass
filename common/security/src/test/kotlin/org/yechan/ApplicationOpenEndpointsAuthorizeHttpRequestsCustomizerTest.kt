@@ -17,13 +17,13 @@ class ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizerTest {
                 false,
                 listOf(
                     OpenEndpointMatcher(HttpMethod.POST, "/login"),
-                    OpenEndpointMatcher(null, "/internal/open"),
+                    OpenEndpointMatcher(HttpMethod.GET, "/internal/open"),
                 ),
             ),
         ).customize(registry)
 
         Mockito.verify(registry).requestMatchers(HttpMethod.POST, "/login")
-        Mockito.verify(registry).requestMatchers("/internal/open")
+        Mockito.verify(registry).requestMatchers(HttpMethod.GET, "/internal/open")
     }
 
     private fun mockApplicationRequestMatcherRegistry(): ApplicationRequestMatcherRegistry {

@@ -1,6 +1,7 @@
 package org.yechan;
 
 import java.time.Clock;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.BeanRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -26,7 +27,7 @@ class ApiResponseMessageConverterBeanRegistrar implements BeanRegistrar {
                 @Override
                 public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
                     builder.configureMessageConvertersList(converters ->
-                        converters.add(0, new ApiResponseHttpMessageConverter(objectMapper, clock)));
+                        converters.addFirst(new ApiResponseHttpMessageConverter(objectMapper, clock)));
                 }
             };
         }));

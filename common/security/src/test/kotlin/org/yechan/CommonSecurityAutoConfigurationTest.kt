@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -235,7 +236,7 @@ class CommonSecurityAutoConfigurationTest {
         fun applicationOpenEndpointPolicy(): ApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
             false,
             listOf(
-                OpenEndpointMatcher(null, "/open"),
+                OpenEndpointMatcher(HttpMethod.GET, "/open"),
             ),
         )
 

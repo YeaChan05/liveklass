@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.hateoas.Link;
 import org.springframework.hateoas.RepresentationModel;
@@ -42,7 +43,7 @@ class ApiHateoasHttpMessageConverter extends AbstractHttpMessageConverter<Object
     }
 
     @Override
-    public boolean canWrite(Class<?> clazz, MediaType mediaType) {
+    public boolean canWrite(Class<?> clazz, @Nullable MediaType mediaType) {
         if (!supports(clazz)) {
             return false;
         }
@@ -54,12 +55,12 @@ class ApiHateoasHttpMessageConverter extends AbstractHttpMessageConverter<Object
     }
 
     @Override
-    public boolean canRead(Class<?> clazz, MediaType mediaType) {
+    public boolean canRead(Class<?> clazz, @Nullable MediaType mediaType) {
         return false;
     }
 
     @Override
-    protected Object readInternal(Class<? extends Object> clazz, HttpInputMessage inputMessage)
+    protected Object readInternal(Class<?> clazz, HttpInputMessage inputMessage)
         throws HttpMessageNotReadableException {
         throw new UnsupportedOperationException("응답 쓰기 전용 MessageConverter입니다.");
     }
@@ -72,20 +73,16 @@ class ApiHateoasHttpMessageConverter extends AbstractHttpMessageConverter<Object
     }
 
     private Object withHateoasLinks(Object body) {
-        if (body instanceof RepresentationModel<?>) {
-            return body;
-        }
-        if (body instanceof Collection<?> collection) {
-            return collection.stream()
+          return switch (body) {
+            case RepresentationModel<?> ignored -> body;
+            case Collection<?> collection -> collection.stream()
                 .map(item -> item == null ? null : withHateoasLinks(item))
                 .toList();
-        }
-        if (body instanceof Object[] array) {
-            return Arrays.stream(array)
-                .map(item -> item == null ? null : withHateoasLinks(item))
+            case Object[] array -> Arrays.stream(array)
+                .map(this::withHateoasLinks)
                 .toList();
-        }
-        return toHateoasModelIfLinkExists(body);
+            default -> toHateoasModelIfLinkExists(body);
+          };
     }
 
     private Object toHateoasModelIfLinkExists(Object body) {

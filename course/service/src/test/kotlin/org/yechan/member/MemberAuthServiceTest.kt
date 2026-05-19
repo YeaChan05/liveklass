@@ -480,7 +480,7 @@ class MemberAuthServiceTest {
 
     private class FakeTokenGenerator : TokenGenerator {
         override fun generate(
-            memberId: Long?,
+            memberId: Long,
             roles: Set<String>,
         ): AuthTokenValue = AuthTokenValue(
             "access-$memberId",
