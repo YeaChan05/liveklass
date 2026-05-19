@@ -60,9 +60,11 @@ class EnrollmentWaitlistRepositoryWriter(
         courseId: Long,
         returnedSeatCount: Int,
     ) {
+        val assignableCount = returnedSeatCount.coerceAtLeast(0)
+
         try {
-            repeat(returnedSeatCount.coerceAtLeast(0)) {
-                assignOne(courseId)
+            repeat(assignableCount) {
+                assignNextWaitlistCandidate(courseId)
             }
         } catch (e: RuntimeException) {
             updateSoldOutFlag(courseId)
@@ -72,7 +74,7 @@ class EnrollmentWaitlistRepositoryWriter(
         updateSoldOutFlag(courseId)
     }
 
-    private fun assignOne(courseId: Long) {
+    private fun assignNextWaitlistCandidate(courseId: Long) {
         while (true) {
             val waitlist = waitlistRepository.peek(courseId) ?: return
             val result = enrollmentWaitlistAssigner.assign(

@@ -23,24 +23,17 @@ class EnrollmentService(
     private val waitlistWriter: EnrollmentWaitlistWriter,
 ) : EnrollmentUseCase {
     override fun enroll(command: EnrollCourseCommand): EnrollResult {
-        val memberId = command.memberId
-        val courseId = command.courseId
-
-        if (waitlistReader.isWaitlistMode(courseId)) {
+        if (waitlistReader.isWaitlistMode(command.courseId)) {
             enrollmentReader.findSeatOccupyingEnrollment(command)?.let {
                 return EnrollResult.Enrolled(it)
             }
 
-            joinWaitlist(courseId, memberId)
-            return EnrollResult.Waitlisted(
-                courseId = courseId,
-                memberId = memberId,
-            )
+            return joinWaitlist(command)
         }
 
         return when (val result = enrollmentWriter.enroll(command)) {
             is EnrollmentTransactionResult.Enrolled -> EnrollResult.Enrolled(result.enrollment)
-            EnrollmentTransactionResult.SoldOut -> joinWaitlistAfterSeatReservationFailed(courseId, memberId)
+            EnrollmentTransactionResult.SoldOut -> enableWaitlistModeAndJoin(command)
         }
     }
 
@@ -67,34 +60,29 @@ class EnrollmentService(
             )
         }
 
-    private fun joinWaitlist(
-        courseId: Long,
-        memberId: Long,
-    ) {
+    private fun joinWaitlist(command: EnrollCourseCommand): EnrollResult.Waitlisted {
         waitlistWriter.joinWaitlist(
-            courseId = courseId,
-            memberId = memberId,
+            courseId = command.courseId,
+            memberId = command.memberId,
             requestedAt = Instant.now(),
+        )
+
+        return EnrollResult.Waitlisted(
+            courseId = command.courseId,
+            memberId = command.memberId,
         )
     }
 
-    private fun joinWaitlistAfterSeatReservationFailed(
-        courseId: Long,
-        memberId: Long,
-    ): EnrollResult.Waitlisted {
-        waitlistWriter.enableWaitlistMode(courseId)
+    private fun enableWaitlistModeAndJoin(command: EnrollCourseCommand): EnrollResult.Waitlisted {
+        waitlistWriter.enableWaitlistMode(command.courseId)
         try {
-            enrollmentReader.requireOpenCourse(courseId)
+            enrollmentReader.requireOpenCourse(command.courseId)
         } catch (e: RuntimeException) {
-            waitlistWriter.disableWaitlistMode(courseId)
+            waitlistWriter.disableWaitlistMode(command.courseId)
             throw e
         }
 
-        joinWaitlist(courseId, memberId)
-        return EnrollResult.Waitlisted(
-            courseId = courseId,
-            memberId = memberId,
-        )
+        return joinWaitlist(command)
     }
 }
 
