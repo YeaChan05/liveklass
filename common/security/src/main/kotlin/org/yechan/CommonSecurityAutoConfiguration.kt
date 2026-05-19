@@ -28,17 +28,17 @@ fun interface SecurityFilterChainCustomizer {
     fun customize(http: HttpSecurity)
 }
 
-class CommonSecurityBeanRegistrar :
+internal class CommonSecurityBeanRegistrar :
     BeanRegistrarDsl({
         registerBean<AccessTokenBlacklist>(fallback = true) {
             NoOpAccessTokenBlacklist
         }
 
-        registerBean<AuthenticationEntryPoint> {
+        registerBean<AuthenticationEntryPoint>(fallback = true) {
             DefaultAuthenticationEntryPoint()
         }
 
-        registerBean<AccessDeniedHandler> {
+        registerBean<AccessDeniedHandler>(fallback = true) {
             DefaultAccessDeniedHandler()
         }
 

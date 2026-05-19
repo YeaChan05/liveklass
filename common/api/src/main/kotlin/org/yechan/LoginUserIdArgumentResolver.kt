@@ -8,7 +8,7 @@ import org.springframework.web.context.request.NativeWebRequest
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.method.support.ModelAndViewContainer
 
-class LoginUserIdArgumentResolver : HandlerMethodArgumentResolver {
+internal class LoginUserIdArgumentResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.hasParameterAnnotation(LoginUserId::class.java) &&
         (parameter.parameterType == Long::class.javaObjectType || parameter.parameterType == Long::class.javaPrimitiveType)
 

@@ -11,7 +11,7 @@ interface PasswordHashEncoder {
     ): Boolean
 }
 
-class BcryptPasswordHashEncoder(
+internal class BcryptPasswordHashEncoder(
     private val passwordEncoder: PasswordEncoder,
 ) : PasswordHashEncoder {
     override fun encode(password: String): String = passwordEncoder.encode(password)!!

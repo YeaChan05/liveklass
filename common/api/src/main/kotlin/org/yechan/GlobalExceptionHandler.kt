@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 private val log = KotlinLogging.logger {}
 
 @RestControllerAdvice
-class GlobalExceptionHandler {
+internal class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException::class)
     fun handleBusinessException(e: BusinessException): ResponseEntity<Any> {
         log.error(e) { e.stackTraceToString() }

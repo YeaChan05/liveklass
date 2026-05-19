@@ -14,7 +14,7 @@ import tools.jackson.databind.ObjectMapper
 class CommonApiRegistrar
 
 @AutoConfiguration
-class CommonApiBeanRegistrar :
+internal class CommonApiBeanRegistrar :
     BeanRegistrarDsl({
         registerBean<LoginUserIdArgumentResolver> {
             LoginUserIdArgumentResolver()

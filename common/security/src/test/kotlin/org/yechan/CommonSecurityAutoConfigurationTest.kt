@@ -16,6 +16,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
+import org.springframework.security.web.AuthenticationEntryPoint
+import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.client.RestTestClient
@@ -220,6 +222,12 @@ class CommonSecurityAutoConfigurationTest {
             .build()
 
         @Bean
+        fun authenticationEntryPoint(): AuthenticationEntryPoint = TestAuthenticationEntryPoint()
+
+        @Bean
+        fun accessDeniedHandler(): AccessDeniedHandler = TestAccessDeniedHandler()
+
+        @Bean
         @org.springframework.context.annotation.Primary
         fun accessTokenBlacklist(): AccessTokenBlacklist = FakeAccessTokenBlacklist()
 
@@ -258,5 +266,25 @@ class CommonSecurityAutoConfigurationTest {
         }
 
         override fun contains(token: String): Boolean = tokens.contains(token)
+    }
+
+    private class TestAuthenticationEntryPoint : AuthenticationEntryPoint {
+        override fun commence(
+            request: jakarta.servlet.http.HttpServletRequest,
+            response: jakarta.servlet.http.HttpServletResponse,
+            authException: org.springframework.security.core.AuthenticationException,
+        ) {
+            response.status = jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED
+        }
+    }
+
+    private class TestAccessDeniedHandler : AccessDeniedHandler {
+        override fun handle(
+            request: jakarta.servlet.http.HttpServletRequest,
+            response: jakarta.servlet.http.HttpServletResponse,
+            accessDeniedException: org.springframework.security.access.AccessDeniedException,
+        ) {
+            response.status = jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN
+        }
     }
 }

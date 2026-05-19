@@ -8,11 +8,11 @@ import org.springframework.security.crypto.password.PasswordEncoder
 @AutoConfiguration
 class PasswordEncoderBeanRegistrar :
     BeanRegistrarDsl({
-        registerBean<PasswordEncoder> {
+        registerBean<PasswordEncoder>(fallback = true) {
             BCryptPasswordEncoder()
         }
 
-        registerBean<PasswordHashEncoder> {
+        registerBean<PasswordHashEncoder>(fallback = true) {
             BcryptPasswordHashEncoder(bean())
         }
     })
