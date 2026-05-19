@@ -20,7 +20,6 @@ class EnrollmentEntityTest {
         // act
         val entity = EnrollmentEntity.from(
             enrollment = enrollment,
-            courseId = 10L,
         )
 
         // assert
@@ -40,7 +39,6 @@ class EnrollmentEntityTest {
                 memberId = 20L,
                 status = EnrollmentStatus.CANCELLED,
             ),
-            courseId = 10L,
         )
 
         // act
@@ -137,6 +135,5 @@ class EnrollmentEntityTest {
             memberId = memberId,
             status = status,
         ),
-        courseId = courseId,
     )
 }

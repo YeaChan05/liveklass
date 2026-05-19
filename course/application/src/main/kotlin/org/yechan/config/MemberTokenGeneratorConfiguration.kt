@@ -8,8 +8,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionTemplate
 import org.yechan.TokenGenerator
-import tools.jackson.databind.ObjectMapper
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDateTime
@@ -28,6 +28,10 @@ data class MemberTokenGeneratorProperties(
     var passwordHash: String = "NOT_USED_BY_K6",
     var role: String = "CLASSMATE",
     var status: String = "ACTIVE",
+
+    // 추가
+    var batchSize: Int = 10_000,
+    var runId: String = System.currentTimeMillis().toString(),
 )
 
 @Component
@@ -38,32 +42,82 @@ data class MemberTokenGeneratorProperties(
 )
 class MemberTokenGenerator(
     private val jdbcTemplate: JdbcTemplate,
+    private val transactionTemplate: TransactionTemplate,
     private val tokenGenerator: TokenGenerator,
-    private val objectMapper: ObjectMapper,
     private val properties: MemberTokenGeneratorProperties,
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         validateProperties()
 
-        val members = createSeedMembers()
-        batchInsertMembers(members)
+        val startedAt = System.currentTimeMillis()
+        val outputPath = Path.of(properties.outputPath)
+        outputPath.parent?.let(Files::createDirectories)
 
-        val tokens = members.map { member ->
-            val token = tokenGenerator.generate(
-                memberId = member.id,
-                roles = setOf(properties.role),
-            )
+        val baseId = System.currentTimeMillis() * 100_000
+        var generatedCount = 0
 
-            token.accessToken
+        Files.newBufferedWriter(outputPath).use { writer ->
+            writer.write("[")
+            var first = true
+
+            while (generatedCount < properties.count) {
+                val chunkStart = generatedCount
+                val chunkEnd = minOf(chunkStart + properties.batchSize, properties.count)
+
+                val members = (chunkStart until chunkEnd).map { index ->
+                    SeedMember(
+                        id = baseId + index,
+                        email = seedEmail(index),
+                        passwordHash = properties.passwordHash,
+                        name = "k6 테스트 수강생-$index",
+                        role = properties.role,
+                        status = properties.status,
+                    )
+                }
+
+                transactionTemplate.executeWithoutResult {
+                    batchInsertMembers(members)
+                }
+
+                for (member in members) {
+                    val accessToken =
+                        tokenGenerator
+                            .generate(
+                                member.id,
+                                setOf(properties.role),
+                            )
+                            .accessToken
+
+                    if (!first) {
+                        writer.write(",")
+                    }
+
+                    writer.write("\n")
+                    writer.write(jsonString(accessToken))
+                    first = false
+                }
+
+                generatedCount = chunkEnd
+
+                if (generatedCount % 100_000 == 0 || generatedCount == properties.count) {
+                    writer.flush()
+                    println("MemberTokenGenerator progress. generated=$generatedCount/${properties.count}")
+                }
+            }
+
+            writer.write("\n]")
         }
 
-        writeTokens(tokens)
+        val elapsedMs = System.currentTimeMillis() - startedAt
 
         println(
             """
             MemberTokenGenerator completed.
-            count=${tokens.size}
+            count=${properties.count}
             outputPath=${properties.outputPath}
+            batchSize=${properties.batchSize}
+            runId=${properties.runId}
+            elapsedMs=$elapsedMs
             """.trimIndent(),
         )
     }
@@ -73,25 +127,16 @@ class MemberTokenGenerator(
             "load-test.member-token-generator.count must be greater than 0"
         }
 
+        require(properties.batchSize > 0) {
+            "load-test.member-token-generator.batch-size must be greater than 0"
+        }
+
         require(properties.outputPath.isNotBlank()) {
             "load-test.member-token-generator.output-path must not be blank"
         }
     }
 
-    private fun createSeedMembers(): List<SeedMember> {
-        val baseId = System.currentTimeMillis() * 100_000
-
-        return (0 until properties.count).map { index ->
-            SeedMember(
-                id = baseId + index,
-                email = "${properties.emailPrefix}-$index@${properties.emailDomain}",
-                passwordHash = properties.passwordHash,
-                name = "k6 테스트 수강생-$index",
-                role = properties.role,
-                status = properties.status,
-            )
-        }
-    }
+    private fun seedEmail(index: Int): String = "${properties.emailPrefix}-${properties.runId}-$index@${properties.emailDomain}"
 
     private fun batchInsertMembers(members: List<SeedMember>) {
         val now = LocalDateTime.now()
@@ -109,15 +154,9 @@ class MemberTokenGenerator(
                 updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                password_hash = VALUES(password_hash),
-                name = VALUES(name),
-                role = VALUES(role),
-                status = VALUES(status),
-                updated_at = VALUES(updated_at)
             """.trimIndent(),
             members,
-            1_000,
+            members.size,
         ) { ps, member ->
             ps.setLong(1, member.id)
             ps.setString(2, member.email)
@@ -130,17 +169,21 @@ class MemberTokenGenerator(
         }
     }
 
-    private fun writeTokens(tokens: List<String>) {
-        val outputPath = Path.of(properties.outputPath)
-        val parent = outputPath.parent
+    private fun jsonString(value: String): String = buildString(value.length + 2) {
+        append('"')
 
-        if (parent != null) {
-            Files.createDirectories(parent)
+        for (char in value) {
+            when (char) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(char)
+            }
         }
 
-        objectMapper
-            .writerWithDefaultPrettyPrinter()
-            .writeValue(outputPath.toFile(), tokens)
+        append('"')
     }
 
     private data class SeedMember(

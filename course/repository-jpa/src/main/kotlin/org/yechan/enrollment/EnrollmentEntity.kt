@@ -25,6 +25,10 @@ import java.time.LocalDateTime
             columnList = "member_id",
         ),
         Index(
+            name = "idx_enrollments_member_status",
+            columnList = "member_id, status",
+        ),
+        Index(
             name = "idx_enrollments_course_status",
             columnList = "course_id, status",
         ),
@@ -61,9 +65,8 @@ class EnrollmentEntity private constructor(
     companion object {
         fun from(
             enrollment: EnrollmentModel,
-            courseId: Long,
         ): EnrollmentEntity = EnrollmentEntity(
-            courseId = courseId,
+            courseId = enrollment.courseId,
             memberId = enrollment.memberId,
             status = enrollment.status,
             paymentPendingStartedAt = enrollment.paymentPendingStartedAt,

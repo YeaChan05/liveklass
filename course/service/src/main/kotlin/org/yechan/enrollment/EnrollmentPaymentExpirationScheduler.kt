@@ -1,19 +1,55 @@
 package org.yechan.enrollment
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import java.time.Clock
 import java.time.LocalDateTime
 
-class EnrollmentPaymentExpirationScheduler(
-    private val enrollmentExpirationUseCase: EnrollmentExpirationUseCase,
-    private val clock: Clock,
+private val log = KotlinLogging.logger {}
+
+interface EnrollmentPaymentExpirationUseCase {
+    fun expirePaymentPendingEnrollments()
+}
+
+open class EnrollmentPaymentExpirationScheduler(
+    private val enrollmentPaymentExpirationService: EnrollmentPaymentExpirationUseCase,
 ) {
-    @Scheduled(
-        fixedDelayString = $$"${enrollment.payment-expiration.fixed-delay-ms:60000}",
-    )
+    @Scheduled(fixedDelayString = $$"${enrollment.payment-expiration.fixed-delay-ms:60000}")
     fun expirePaymentPendingEnrollments() {
-        enrollmentExpirationUseCase.expirePaymentPendingEnrollments(
-            now = LocalDateTime.now(clock),
-        )
+        enrollmentPaymentExpirationService.expirePaymentPendingEnrollments()
+    }
+}
+
+open class EnrollmentPaymentExpirationService(
+    private val enrollmentReader: EnrollmentReader,
+    private val enrollmentExpirationProcessor: EnrollmentExpirationProcessor,
+    private val waitlistWriter: EnrollmentWaitlistWriter,
+    private val clock: Clock,
+) : EnrollmentPaymentExpirationUseCase {
+    override fun expirePaymentPendingEnrollments() {
+        val now = LocalDateTime.now(clock)
+        val targets =
+            enrollmentReader.findExpiredPaymentPendingTargets(now = now, limit = 100)
+
+        if (targets.isEmpty()) {
+            return
+        }
+
+        val countsByCourseId =
+            enrollmentExpirationProcessor.expireAll(
+                courseIds = targets.map { it.courseId }.distinct(),
+                now = now,
+            )
+
+        val expiredCount = countsByCourseId.values.sum()
+        countsByCourseId.forEach { (courseId, expiredCount) ->
+            waitlistWriter.assignAfterSeatRelease(courseId, expiredCount)
+        }
+
+        if (expiredCount > 0) {
+            log.info {
+                "결제 대기 만료 처리 완료: ${expiredCount}건, ${countsByCourseId.size}개 강의의 반환 좌석을 처리했습니다."
+            }
+        }
     }
 }

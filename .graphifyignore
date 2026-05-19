@@ -5,3 +5,10 @@
 out/
 *.iml
 .obsidian
+.omx/
+.codex/
+graphify-out/
+**/logs/
+**/reports/
+**/test-results/
+**/generated/

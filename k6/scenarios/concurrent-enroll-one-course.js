@@ -1,14 +1,16 @@
-import http from 'k6/http';
+import http, { expectedStatuses } from 'k6/http';
 import { check, fail } from 'k6';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 
-const TOKEN_PATH = __ENV.TOKEN_PATH || './k6/tokens.json';
+const TOKEN_PATH = __ENV.TOKEN_PATH || '../tokens.json';
 
 const applicantTokens = new SharedArray('applicant tokens', function () {
   return JSON.parse(open(TOKEN_PATH));
 });
+
+http.setResponseCallback(expectedStatuses(200, 201, 202, 409));
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const API_VERSION = __ENV.API_VERSION || 'v1';
@@ -43,15 +45,21 @@ export const options = {
   },
 
   thresholds: {
-    http_req_failed: ['rate<0.99'],
+    http_req_failed: ['rate<0.01'],
     http_req_duration: ['p(95)<2000'],
-    enroll_success: [`count==${COURSE_CAPACITY}`],
-    enroll_failed: [`count==${APPLICANT_COUNT - COURSE_CAPACITY}`],
+    enroll_success: [`count==${APPLICANT_COUNT}`],
+    enroll_failed: ['count==0'],
   },
 };
 
 export function setup() {
   const testId = Date.now();
+
+  if (applicantTokens.length < APPLICANT_COUNT) {
+    fail(`tokens are not enough. tokenCount=${applicantTokens.length}, applicantCount=${APPLICANT_COUNT}`);
+  }
+
+  assertApplicantTokenUsable(applicantTokens[0]);
 
   const creatorEmail = `creator-${testId}@test.com`;
   const creatorPassword = 'password1234';
@@ -85,10 +93,6 @@ export function setup() {
 
   openCourse(creatorToken, courseId);
 
-  if (applicantTokens.length < APPLICANT_COUNT) {
-    fail(`tokens are not enough. tokenCount=${applicantTokens.length}, applicantCount=${APPLICANT_COUNT}`);
-  }
-
   return {
     courseId,
     creatorToken,
@@ -118,23 +122,63 @@ export default function (data) {
       },
   );
 
-  const success =
-      res.status === 200 ||
-      res.status === 201;
+  const body = parseJsonOrNull(res);
+  const responseBody = body ?? {};
+  const success = res.status === 200 || res.status === 201;
 
   if (success) {
     enrollSuccess.add(1);
   } else {
     enrollFailed.add(1);
+
+    if (index < 5) {
+      console.error(`unexpected enroll response. index=${index}`);
+      console.error(`status=${res.status}`);
+      console.error(`body=${res.body}`);
+    }
   }
 
-  check(res, {
-    '수강 신청 성공 또는 정원 초과 실패': (r) =>
-        r.status === 200 ||
-        r.status === 201 ||
-        r.status === 400 ||
-        r.status === 409,
+  check(responseBody, {
+    '수강 신청 200 응답': (enrollment) =>
+        success &&
+        enrollment != null &&
+        enrollment.courseId != null &&
+        enrollment.memberId != null &&
+        (enrollment.status === 'PENDING' || enrollment.status === 'WAITLISTED'),
   });
+}
+
+function assertApplicantTokenUsable(token) {
+  if (!token) {
+    fail('first applicant token is missing');
+  }
+
+  const res = http.get(`${BASE_URL}/api/enrollments/me`, {
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    },
+    tags: {
+      name: 'GET /api/enrollments/me',
+    },
+  });
+
+  const success = res.status === 200;
+
+  check(res, {
+    '수강생 토큰 사전 검증 성공': () => success,
+  });
+
+  if (!success) {
+    console.error('applicant token preflight failed');
+    console.error(`status=${res.status}`);
+    console.error(`body=${res.body}`);
+
+    fail(
+        'applicant token is not accepted by the running application. ' +
+        'Regenerate k6/tokens.json from the same application/database before running this scenario.',
+    );
+  }
 }
 
 function parseJsonOrNull(res) {

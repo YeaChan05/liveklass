@@ -2,11 +2,15 @@ package org.yechan
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.BeanRegistrarDsl
+import org.springframework.beans.factory.BeanRegistrar
+import org.springframework.beans.factory.BeanRegistry
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import org.springframework.core.env.Environment
 import org.springframework.core.env.MapPropertySource
+import java.util.function.BiConsumer
+import java.util.function.Predicate
 
 class BeanRegistrarExtensionsTest {
     @Test
@@ -108,34 +112,68 @@ class BeanRegistrarExtensionsTest {
     @Import(ConditionalChainBeanRegistrar::class)
     class TestConditionalChainConfiguration
 
-    class MatchIfMissingBeanRegistrar :
-        BeanRegistrarDsl({
-            whenPropertyEnabled("sample.feature", "enabled", matchIfMissing = true) {
-                registerBean<String>("sample") { "enabled" }
-            }
-        })
+    class MatchIfMissingBeanRegistrar : BeanRegistrar {
+        override fun register(
+            registry: BeanRegistry,
+            env: Environment,
+        ) {
+            BeanRegistrarUtils.whenPropertyEnabled(
+                registry,
+                env,
+                "sample.feature",
+                "enabled",
+                "true",
+                true,
+                BiConsumer { beanRegistry, _ -> registerStringBean(beanRegistry, "sample", "enabled") },
+            )
+        }
+    }
 
-    class ExactMatchBeanRegistrar :
-        BeanRegistrarDsl({
-            whenPropertyEnabled("sample.feature", "enabled") {
-                registerBean<String>("sample") { "enabled" }
-            }
-        })
+    class ExactMatchBeanRegistrar : BeanRegistrar {
+        override fun register(
+            registry: BeanRegistry,
+            env: Environment,
+        ) {
+            BeanRegistrarUtils.whenPropertyEnabled(
+                registry,
+                env,
+                "sample.feature",
+                "enabled",
+                BiConsumer { beanRegistry, _ -> registerStringBean(beanRegistry, "sample", "enabled") },
+            )
+        }
+    }
 
-    class ConditionalChainBeanRegistrar :
-        BeanRegistrarDsl({
-            registerIf(
-                predicate = { it.getProperty("sample.feature.mode") == "alpha" },
-            ) {
-                registerBean<String>("alpha") { "alpha" }
-            }
+    class ConditionalChainBeanRegistrar : BeanRegistrar {
+        override fun register(
+            registry: BeanRegistry,
+            env: Environment,
+        ) {
+            BeanRegistrarUtils.registerIf(
+                registry,
+                env,
+                Predicate { it.getProperty("sample.feature.mode") == "alpha" },
+                BiConsumer { beanRegistry, _ -> registerStringBean(beanRegistry, "alpha", "alpha") },
+            )
                 .orElseIf(
-                    predicate = { it.getProperty("sample.feature.mode") == "beta" },
-                ) {
-                    registerBean<String>("beta") { "beta" }
-                }
-                .orElse {
-                    registerBean<String>("fallback") { "fallback" }
-                }
-        })
+                    Predicate { it.getProperty("sample.feature.mode") == "beta" },
+                    BiConsumer { beanRegistry, _ -> registerStringBean(beanRegistry, "beta", "beta") },
+                )
+                .orElse(
+                    BiConsumer { beanRegistry, _ -> registerStringBean(beanRegistry, "fallback", "fallback") },
+                )
+        }
+    }
+
+    companion object {
+        private fun registerStringBean(
+            registry: BeanRegistry,
+            name: String,
+            value: String,
+        ) {
+            registry.registerBean(name, String::class.java) { spec ->
+                spec.supplier { value }
+            }
+        }
+    }
 }

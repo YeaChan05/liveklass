@@ -14,7 +14,7 @@ CREATE TABLE members
 
 CREATE TABLE courses
 (
-    id              BIGINT         NOT NULL AUTO_INCREMENT,
+    id              BIGINT         NOT NULL,
     creator_id      BIGINT         NOT NULL,
 
     title           VARCHAR(100)   NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE courses
 );
 
 CREATE TABLE enrollments (
-    id BIGINT NOT NULL AUTO_INCREMENT,
+    id BIGINT NOT NULL,
     course_id BIGINT NOT NULL,
     member_id BIGINT NOT NULL,
     status VARCHAR(20) NOT NULL,
@@ -56,6 +56,7 @@ CREATE TABLE enrollments (
         UNIQUE (course_id, member_id),
 
     INDEX idx_enrollments_member_id (member_id),
+    INDEX idx_enrollments_member_status (member_id, status),
     INDEX idx_enrollments_course_status (course_id, status),
     INDEX idx_enrollments_status_payment_pending_expires_at (status, payment_pending_expires_at)
 );

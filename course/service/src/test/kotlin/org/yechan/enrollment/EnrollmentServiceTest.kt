@@ -9,6 +9,8 @@ import org.yechan.FakeEnrollmentWaitlistRepository
 import org.yechan.FakeMemberRepository
 import org.yechan.course.CourseInvalidStateException
 import org.yechan.course.CourseNotFoundException
+import org.yechan.course.CourseRepositoryReader
+import org.yechan.course.CourseRepositoryWriter
 import org.yechan.course.CourseService
 import org.yechan.course.CourseStatusCommand
 import org.yechan.course.CreateCourseCommand
@@ -17,6 +19,8 @@ import org.yechan.course.Money
 import org.yechan.member.MemberModelData
 import org.yechan.member.MemberRole
 import org.yechan.member.MemberStatus
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 
 class EnrollmentServiceTest {
@@ -24,12 +28,31 @@ class EnrollmentServiceTest {
     private val courseRepository = FakeCourseRepository()
     private val enrollmentRepository = FakeEnrollmentRepository()
     private val waitlistRepository = FakeEnrollmentWaitlistRepository()
-    private val courseService = CourseService(memberRepository, courseRepository)
+    private val courseService = CourseService(
+        CourseRepositoryReader(courseRepository),
+        CourseRepositoryWriter(memberRepository, courseRepository),
+    )
+    private val enrollmentReader =
+        EnrollmentRepositoryReader(courseRepository, enrollmentRepository)
+    private val enrollmentWriter =
+        EnrollmentRepositoryWriter(courseRepository, enrollmentRepository)
+    private val waitlistReader =
+        EnrollmentWaitlistRepositoryReader(waitlistRepository)
+    private val waitlistWriter =
+        EnrollmentWaitlistRepositoryWriter(
+            waitlistRepository,
+            EnrollmentWaitlistAssignmentService(
+                courseRepository,
+                enrollmentRepository,
+                enrollmentRepository,
+            ),
+        )
     private val service =
         EnrollmentService(
-            courseRepository,
-            enrollmentRepository,
-            waitlistRepository,
+            enrollmentReader,
+            enrollmentWriter,
+            waitlistReader,
+            waitlistWriter,
         )
 
     @Test
@@ -40,7 +63,12 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
         val changedCourse = courseService.getCourse(course.courseId)
 
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
@@ -48,7 +76,24 @@ class EnrollmentServiceTest {
     }
 
     @Test
-    fun `남은 좌석이 없으면 수강 신청은 실패한다`() {
+    fun `매진 표시 전 신규 수강 신청은 기존 신청을 한 번만 조회한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        service.enroll(
+            EnrollCourseCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        assertThat(enrollmentRepository.findByMemberIdAndCourseIdCallCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `남은 좌석이 없으면 수강 신청은 대기열에 등록된다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
@@ -56,28 +101,77 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("강의 정원을 초과할 수 없습니다.")
 
-        assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
+        assertThat(waitlisted).isEqualTo(
+            EnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 3L,
+            ),
+        )
+
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+        assertThat(waitlistRepository.pop(course.courseId)?.memberId).isEqualTo(3L)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
     }
 
     @Test
-    fun `내 수강 신청 목록을 조회한다`() {
+    fun `만료된 신청은 같은 수강 신청 row를 다시 사용한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
-        service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+
+        val expired = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.courseId,
+                memberId = 2L,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val reenrolled =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
+
+        assertThat(reenrolled.enrollmentId).isEqualTo(expired.enrollmentId)
+        assertThat(reenrolled.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(courseService.getCourse(course.courseId).seatLeftCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `내 수강 신청 목록은 확정과 취소 상태만 조회한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val pendingCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val confirmedCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val cancelledCourse = courseService.createCourse(createCourseCommand(), 1L)
+        val expiredCourse = courseService.createCourse(createCourseCommand(), 1L)
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = pendingCourse.courseId, memberId = 2L, status = EnrollmentStatus.PENDING),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = confirmedCourse.courseId, memberId = 2L, status = EnrollmentStatus.CONFIRMED),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = cancelledCourse.courseId, memberId = 2L, status = EnrollmentStatus.CANCELLED),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(courseId = expiredCourse.courseId, memberId = 2L, status = EnrollmentStatus.EXPIRED),
+        )
 
         val enrollments = service.getMyEnrollments(2L)
 
-        assertThat(enrollments.size).isEqualTo(1)
-        assertThat(enrollments.single().memberId).isEqualTo(2L)
+        assertThat(enrollments.map(EnrollmentInfo::status))
+            .containsExactlyInAnyOrder(EnrollmentStatus.CONFIRMED, EnrollmentStatus.CANCELLED)
+        assertThat(enrollments).allSatisfy { enrollment ->
+            assertThat(enrollment.memberId).isEqualTo(2L)
+        }
     }
 
     @Test
@@ -87,7 +181,12 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 1L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
 
         val confirmed =
             service.confirmEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
@@ -107,7 +206,12 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 1L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 1L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
 
         val cancelled =
             service.cancelEnrollment(EnrollmentStatusCommand(1L, enrollment.enrollmentId))
@@ -137,7 +241,12 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
 
         assertThatThrownBy {
             service.confirmEnrollment(
@@ -157,7 +266,12 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
         service.confirmEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
@@ -184,7 +298,12 @@ class EnrollmentServiceTest {
         val course = courseService.createCourse(createCourseCommand(), 1L)
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
         service.cancelEnrollment(
             EnrollmentStatusCommand(
                 memberId = 2L,
@@ -214,7 +333,7 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+            .hasMessage("모집중인 강의가 아닙니다.")
     }
 
     @Test
@@ -229,7 +348,7 @@ class EnrollmentServiceTest {
             service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
         }
             .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("모집 중인 강의만 신청할 수 있습니다.")
+            .hasMessage("모집중인 강의가 아닙니다.")
     }
 
     @Test
@@ -256,7 +375,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         service.cancelEnrollment(
             EnrollmentStatusCommand(
@@ -285,7 +404,12 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
 
         val beforeCancelCourse = courseService.getCourse(course.courseId)
 
@@ -308,7 +432,12 @@ class EnrollmentServiceTest {
         courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
 
         val enrollment =
-            service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
 
         val confirmed =
             service.confirmEnrollment(EnrollmentStatusCommand(2L, enrollment.enrollmentId))
@@ -340,7 +469,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         assertThatThrownBy {
             service.cancelEnrollment(
@@ -383,17 +512,22 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(
                 EnrollCourseCommand(
                     memberId = 3L,
                     courseId = course.courseId,
                 ),
             )
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
+
+        assertThat(waitlisted).isEqualTo(
+            EnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 3L,
+            ),
+        )
 
         assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
 
@@ -408,6 +542,84 @@ class EnrollmentServiceTest {
     }
 
     @Test
+    fun `수강 취소로 좌석이 반환되면 신규 신청자보다 대기열 선두 회원이 먼저 승격된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 4L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled = service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrolled.enrollmentId,
+            ),
+        )
+
+        val assigned = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = 3L,
+            courseId = course.courseId,
+        )
+        val changedCourse = courseService.getCourse(course.courseId)
+
+        assertThat(assigned?.status).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(changedCourse.seatLeftCount).isEqualTo(0)
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.findByMemberId(4L)).hasSize(1)
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+    }
+
+    @Test
+    fun `수강 취소 승격 후 대기열이 비면 매진 표시를 해제한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled = service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId)).enrollment
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+
+        service.cancelEnrollment(
+            EnrollmentStatusCommand(
+                memberId = 2L,
+                enrollmentId = enrolled.enrollmentId,
+            ),
+        )
+
+        assertThat(
+            enrollmentRepository.findByMemberIdAndCourseId(
+                memberId = 3L,
+                courseId = course.courseId,
+            )?.status,
+        ).isEqualTo(EnrollmentStatus.PENDING)
+        assertThat(waitlistRepository.findByMemberId(3L)).isEmpty()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `이미 대기 중인 회원이 다시 신청해도 순번이 변경되지 않는다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 4L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 2L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+        service.enroll(EnrollCourseCommand(memberId = 4L, courseId = course.courseId))
+
+        val rankBefore = waitlistRepository.rank(course.courseId, 3L)
+        service.enroll(EnrollCourseCommand(memberId = 3L, courseId = course.courseId))
+
+        assertThat(waitlistRepository.rank(course.courseId, 3L)).isEqualTo(rankBefore)
+        assertThat(waitlistRepository.rank(course.courseId, 4L)).isEqualTo(2)
+    }
+
+    @Test
     fun `이미 매진 표시된 강의는 좌석 확보를 시도하지 않고 대기열에 등록한다`() {
         memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
         memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
@@ -416,25 +628,97 @@ class EnrollmentServiceTest {
 
         waitlistRepository.markSoldOut(course.courseId)
 
-        assertThatThrownBy {
+        val waitlisted =
             service.enroll(
                 EnrollCourseCommand(
                     memberId = 2L,
                     courseId = course.courseId,
                 ),
             )
-        }
-            .isInstanceOf(CourseInvalidStateException::class.java)
-            .hasMessage("강의 정원을 초과할 수 없습니다.")
+
+        assertThat(waitlisted).isEqualTo(
+            EnrollResult.Waitlisted(
+                courseId = course.courseId,
+                memberId = 2L,
+            ),
+        )
 
         val changedCourse = courseService.getCourse(course.courseId)
-        val waitlisted = waitlistRepository.pop(course.courseId)
+        val popped = waitlistRepository.pop(course.courseId)
         val enrollments = service.getMyEnrollments(2L)
 
         assertThat(changedCourse.seatLeftCount).isEqualTo(2)
-        assertThat(waitlisted?.memberId).isEqualTo(2L)
+        assertThat(popped?.memberId).isEqualTo(2L)
         assertThat(enrollments).isEmpty()
-        assertThat(waitlistRepository.isSoldOut(course.courseId)).isTrue()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
+    }
+
+    @Test
+    fun `이미 신청한 클래스메이트는 매진 표시된 강의를 다시 신청해도 대기열에 등록되지 않는다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val enrolled =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            ).enrollment
+
+        waitlistRepository.markSoldOut(course.courseId)
+
+        val result =
+            service.enroll(
+                EnrollCourseCommand(
+                    memberId = 2L,
+                    courseId = course.courseId,
+                ),
+            )
+
+        assertThat(result).isEqualTo(EnrollResult.Enrolled(enrolled))
+        assertThat(waitlistRepository.findByMemberId(2L)).isEmpty()
+    }
+
+    @Test
+    fun `내 대기열을 조회한다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        memberRepository.save(member(id = 3L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
+        waitlistRepository.enqueue(course.courseId, 3L, Instant.parse("2026-01-01T00:00:01Z"))
+
+        val waitlist = service.getMyWaitlist(2L)
+
+        assertThat(waitlist).hasSize(1)
+        assertThat(waitlist.single().courseId).isEqualTo(course.courseId)
+        assertThat(waitlist.single().memberId).isEqualTo(2L)
+        assertThat(waitlist.single().requestedAt).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"))
+    }
+
+    @Test
+    fun `대기열 신청을 취소하면 마지막 대기열일 때 매진 표시가 해제된다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 1), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+
+        waitlistRepository.markSoldOut(course.courseId)
+        waitlistRepository.enqueue(course.courseId, 2L, Instant.parse("2026-01-01T00:00:00Z"))
+
+        service.cancelWaitlist(
+            EnrollmentWaitlistCommand(
+                memberId = 2L,
+                courseId = course.courseId,
+            ),
+        )
+
+        assertThat(waitlistRepository.findByMemberId(2L)).isEmpty()
+        assertThat(waitlistRepository.isSoldOut(course.courseId)).isFalse()
     }
 
     @Test
@@ -449,7 +733,7 @@ class EnrollmentServiceTest {
                 memberId = 2L,
                 courseId = course.courseId,
             ),
-        )
+        ).enrollment
 
         val confirmed = service.confirmEnrollment(
             EnrollmentStatusCommand(
@@ -463,6 +747,30 @@ class EnrollmentServiceTest {
         assertThat(enrollment.status).isEqualTo(EnrollmentStatus.PENDING)
         assertThat(confirmed.status).isEqualTo(EnrollmentStatus.CONFIRMED)
         assertThat(changedCourse.seatLeftCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `결제 대기 만료 시간은 설정값을 따른다`() {
+        memberRepository.save(member(id = 1L, role = MemberRole.CREATOR))
+        memberRepository.save(member(id = 2L, role = MemberRole.CLASSMATE))
+        val course = courseService.createCourse(createCourseCommand(capacity = 2), 1L)
+        courseService.openCourse(CourseStatusCommand(memberId = 1L, courseId = course.courseId))
+        val customTransactionService = EnrollmentRepositoryWriter(
+            courseRepository = courseRepository,
+            enrollmentRepository = enrollmentRepository,
+            paymentPendingExpiresIn = Duration.ofMinutes(3),
+        )
+
+        val enrolled = customTransactionService.enroll(
+            EnrollCourseCommand(memberId = 2L, courseId = course.courseId),
+        )
+
+        val result = (enrolled as EnrollmentTransactionResult.Enrolled).enrollment
+        val saved =
+            enrollmentRepository.findById(result.enrollmentId) ?: error("missing enrollment")
+
+        assertThat(Duration.between(saved.paymentPendingStartedAt, saved.paymentPendingExpiresAt))
+            .isEqualTo(Duration.ofMinutes(3))
     }
 
     private fun createCourseCommand(

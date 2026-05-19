@@ -17,11 +17,44 @@ interface CourseUseCase {
     fun closeCourse(command: CourseStatusCommand): CourseResult
 }
 
-@Transactional(readOnly = true)
+interface CourseReader {
+    fun getCourse(courseId: Long): CourseResult
+
+    fun getCourses(status: CourseStatus? = null): List<CourseResult>
+
+    fun getOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseResult>
+}
+
+interface CourseWriter {
+    fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult
+
+    fun openCourse(command: CourseStatusCommand): CourseResult
+
+    fun closeCourse(command: CourseStatusCommand): CourseResult
+}
+
 class CourseService(
-    private val memberRepository: MemberRepository,
-    private val courseRepository: CourseRepository,
+    private val reader: CourseReader,
+    private val writer: CourseWriter,
 ) : CourseUseCase {
+    override fun getCourse(courseId: Long): CourseResult = reader.getCourse(courseId)
+
+    override fun getCourses(status: CourseStatus?): List<CourseResult> = reader.getCourses(status)
+
+    override fun createCourse(
+        command: CreateCourseCommand,
+        creatorId: Long,
+    ): CourseResult = writer.createCourse(command, creatorId)
+
+    override fun openCourse(command: CourseStatusCommand): CourseResult = writer.openCourse(command)
+
+    override fun closeCourse(command: CourseStatusCommand): CourseResult = writer.closeCourse(command)
+}
+
+@Transactional(readOnly = true)
+class CourseRepositoryReader(
+    private val courseRepository: CourseRepository,
+) : CourseReader {
     override fun getCourse(courseId: Long): CourseResult = (courseRepository.findById(courseId) ?: throw CourseNotFoundException()).toResult()
 
     override fun getCourses(status: CourseStatus?): List<CourseResult> = when (status) {
@@ -29,11 +62,22 @@ class CourseService(
         else -> courseRepository.findAllByStatus(status)
     }.map(CourseModel::toResult)
 
+    override fun getOpenedCoursesByIds(courseIds: Collection<Long>): List<CourseResult> = courseRepository.findAllOpenedCoursesByIds(courseIds).map(CourseModel::toResult)
+}
+
+@Transactional(readOnly = true)
+class CourseRepositoryWriter(
+    private val memberRepository: MemberRepository,
+    private val courseRepository: CourseRepository,
+) : CourseWriter {
     @Transactional
-    override fun createCourse(command: CreateCourseCommand, creatorId: Long): CourseResult {
+    override fun createCourse(
+        command: CreateCourseCommand,
+        creatorId: Long,
+    ): CourseResult {
         val creator = activeMember(creatorId)
         val course = CourseModelData(
-            creatorId = requireNotNull(creator.memberId),
+            creatorId = creator.memberId,
             title = command.title,
             description = command.description,
             price = command.price,
@@ -41,7 +85,6 @@ class CourseService(
             periodStart = command.periodStart,
             periodEnd = command.periodEnd,
         )
-
         return courseRepository.save(course).toResult()
     }
 
@@ -67,9 +110,11 @@ class CourseService(
         courseId: Long,
         memberId: Long,
     ): CourseModel {
-        activeMember(memberId)
+        val member = activeMember(memberId)
         val course = courseRepository.findById(courseId) ?: throw CourseNotFoundException()
-        if (course.creatorId != memberId) throw CourseAccessDeniedException()
+        if (course.creatorId != member.memberId) {
+            throw CourseAccessDeniedException()
+        }
         return course
     }
 }
@@ -82,7 +127,6 @@ private fun CourseModel.toResult(): CourseResult = CourseResult(
     price = price,
     capacity = capacity,
     seatLeftCount = seatLeftCount,
-    currentEnrollmentCount = capacity - seatLeftCount,
     periodStart = periodStart,
     periodEnd = periodEnd,
     status = status,

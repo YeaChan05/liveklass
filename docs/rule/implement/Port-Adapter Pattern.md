@@ -131,13 +131,13 @@ class {Domain}InfrastructureBeanRegistrar :
 
 #### 6. Assembly는 adapter를 조립하지만 core 규칙을 바꾸지 않는다
 
-`application`, `application-root` 같은 실행 모듈은 port와 adapter를 연결해주는 조립 지점이다
+`application` 같은 실행 모듈은 port와 adapter를 연결해주는 조립 지점이다
 
 여기서 어떤 adapter를 붙일지는 바뀔 수 있지만, core가 port만 바라본다는 규칙은 바뀌지 않는다
 
 즉 same-process 최적화가 필요하더라도 `service`가 provider bean을 직접 참조하도록 규칙을 풀지 않는다
 
-현재 프로젝트의 `application-root`는 이 점을 보여주는 예시가 된다
+현재 프로젝트의 runnable application은 이 점을 보여주는 예시가 된다
 
 provider 쪽 `api-internal`은 구현체를 직접 bean으로 등록할 수 있다
 
@@ -153,7 +153,7 @@ class {Provider}InternalApiBeanRegistrar :
     })
 ```
 
-이렇게 하면 `application-root` 같은 same-process runtime에서는 HTTP 호출 없이도 `{Provider}InternalApi` 구현체가 바로 조립될 수 있다
+이렇게 하면 같은 프로세스에서 실행되는 runtime에서는 HTTP 호출 없이도 `{Provider}InternalApi` 구현체가 바로 조립될 수 있다
 
 반대로 분리 실행 환경에서는 consumer `infrastructure`가 같은 `{Provider}InternalApi` 계약에 대해 HTTP client를 만들 수 있다
 
@@ -205,6 +205,6 @@ class {Consumer}InfrastructureBeanRegistrar :
 `service`는 inbound port와 use case
 `infrastructure`는 outbound port와 consumer-side 경계
 `repository-*`, `mq-*`는 driven adapter
-`application`, `application-root`는 assembly 역할을 맡는다
+`application`은 assembly 역할을 맡는다
 
 새 기능을 추가할 때도 먼저 이 위치 관계를 지키는지 확인한 뒤 코드를 배치해야 한다

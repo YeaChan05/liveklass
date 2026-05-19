@@ -13,7 +13,6 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.TestPropertySource
 import org.yechan.course.CourseEntity
 import org.yechan.enrollment.EnrollmentEntity
 
@@ -21,16 +20,6 @@ import org.yechan.enrollment.EnrollmentEntity
 @Import(MemberRepositoryImpl::class)
 @ContextConfiguration(classes = [MemberRepositoryImplTest.TestApplication::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(
-    properties = [
-        "spring.datasource.url=jdbc:tc:mysql:8.4.8://localhost:3306/course_repository_test?useSSL=false&serverTimezone=UTC&TC_DAEMON=true",
-        "spring.datasource.driver-class-name=org.testcontainers.jdbc.ContainerDatabaseDriver",
-        "spring.datasource.username=root",
-        "spring.datasource.password=password",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.liquibase.enabled=false",
-    ],
-)
 class MemberRepositoryImplTest {
     @Autowired
     private lateinit var memberRepository: MemberRepositoryImpl
@@ -67,7 +56,8 @@ class MemberRepositoryImplTest {
 
     @Test
     fun `이메일 조회는 저장된 회원을 반환한다`() {
-        val saved = memberRepository.save(member(email = "creator@example.com", role = MemberRole.CREATOR))
+        val saved =
+            memberRepository.save(member(email = "creator@example.com", role = MemberRole.CREATOR))
 
         val found = memberRepository.findByEmail("creator@example.com")
 

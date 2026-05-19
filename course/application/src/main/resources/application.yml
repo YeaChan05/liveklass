@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/course?useSSL=false&serverTimezone=UTC&useInformationSchema=true
+    url: jdbc:mysql://localhost:3306/course?useSSL=false&serverTimezone=UTC&useInformationSchema=true&rewriteBatchedStatements=true
     username: root
     password: password
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -16,6 +16,7 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 management:
@@ -41,15 +42,23 @@ management:
 
 auth:
   token:
-    access-expires-in: 3600 # 1 hour
-    refresh-expires-in: 86400 # 24 hours
+    access-expires-in: ${AUTH_TOKEN_ACCESS_EXPIRES_IN:3600} # 1 hour
+    refresh-expires-in: ${AUTH_TOKEN_REFRESH_EXPIRES_IN:86400} # 24 hours
     salt: "saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt"
+
+enrollment:
+  waitlist:
+    ttl: ${ENROLLMENT_WAITLIST_TTL:1d}
+  payment-pending:
+    expires-in: ${ENROLLMENT_PAYMENT_PENDING_EXPIRES_IN:10m}
 
 load-test:
   member-token-generator:
     enabled: ${MEMBER_TOKEN_GENERATOR_ENABLED:false}
     count: ${MEMBER_TOKEN_GENERATOR_COUNT:5000}
     output-path: ${MEMBER_TOKEN_GENERATOR_OUTPUT_PATH:./k6/tokens.json}
+    batch-size: ${MEMBER_TOKEN_GENERATOR_BATCH_SIZE:5000}
+    run-id: ${MEMBER_TOKEN_GENERATOR_RUN_ID:${random.uuid}}
     email-prefix: k6-classmate
     email-domain: test.com
     password-hash: NOT_USED_BY_K6

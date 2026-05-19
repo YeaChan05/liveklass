@@ -20,6 +20,8 @@ class EnrollmentAuthorizationPolicy :
                     .hasRole(CLASSMATE.name)
                 registry.requestMatchers(POST, "/api/enrollments/{enrollmentId}/cancel")
                     .hasRole(CLASSMATE.name)
+                registry.requestMatchers(HttpMethod.DELETE, "/api/enrollments/waitlist/{courseId}")
+                    .hasRole(CLASSMATE.name)
                 registry.requestMatchers(HttpMethod.GET, "/api/enrollments/me")
                     .hasRole(CLASSMATE.name)
             }

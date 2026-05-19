@@ -1,5 +1,7 @@
 package org.yechan.enrollment
 
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -11,6 +13,7 @@ import org.yechan.LoginUserId
 @RequestMapping("/api", version = "v1")
 class EnrollmentController(
     private val enrollmentUseCase: EnrollmentUseCase,
+    private val enrollmentWaitlistSseHandler: EnrollmentWaitlistSseHandler,
 ) {
     @PostMapping("/courses/{courseId}/enrollments")
     fun enroll(
@@ -32,15 +35,42 @@ class EnrollmentController(
     ): EnrollmentResponse = enrollmentUseCase.cancelEnrollment(EnrollmentStatusCommand(userId, enrollmentId))
         .toResponse()
 
+    @DeleteMapping("/enrollments/waitlist/{courseId}")
+    fun cancelWaitlist(
+        @LoginUserId userId: Long,
+        @PathVariable courseId: Long,
+    ): ResponseEntity<Void> {
+        enrollmentUseCase.cancelWaitlist(EnrollmentWaitlistCommand(userId, courseId))
+        return ResponseEntity.noContent().build()
+    }
+
     @GetMapping("/enrollments/me")
     fun getMyEnrollments(
         @LoginUserId userId: Long,
-    ): List<EnrollmentResponse> = enrollmentUseCase.getMyEnrollments(userId).map(EnrollmentResult::toResponse)
+    ): List<EnrollmentResponse> = enrollmentUseCase.getMyEnrollments(userId).map(EnrollmentInfo::toResponse)
+
+    @GetMapping("/enrollments/waitlist/me", produces = ["text/event-stream"])
+    fun getMyWaitlist(
+        @LoginUserId userId: Long,
+    ) = enrollmentWaitlistSseHandler.getMyWaitlist(userId)
 }
 
-private fun EnrollmentResult.toResponse(): EnrollmentResponse = EnrollmentResponse(
+private fun EnrollmentInfo.toResponse(): EnrollmentResponse = EnrollmentResponse(
     enrollmentId = enrollmentId,
     courseId = courseId,
     memberId = memberId,
-    status = status,
+    status = status.toResponseStatus(),
 )
+
+private fun EnrollResult.toResponse(): EnrollmentResponse = when (this) {
+    is EnrollResult.Enrolled -> enrollment.toResponse()
+
+    is EnrollResult.Waitlisted -> EnrollmentResponse(
+        enrollmentId = null,
+        courseId = courseId,
+        memberId = memberId,
+        status = EnrollmentResponseStatus.WAITLISTED,
+    )
+}
+
+private fun EnrollmentStatus.toResponseStatus(): EnrollmentResponseStatus = EnrollmentResponseStatus.valueOf(name)

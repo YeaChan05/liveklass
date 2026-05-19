@@ -18,6 +18,72 @@ import java.time.LocalDateTime
 import java.util.Collections
 
 class MemberAuthServiceTest {
+
+    @Test
+    fun `회원가입 요청은 쓰기 처리기에 맡긴다`() {
+        // Arrange
+        val writer = RecordingMemberAuthWriter()
+        val service = MemberAuthService(
+            writer,
+            RecordingMemberAuthReader(),
+        )
+        val command = SignupCommand(
+            "student@example.com",
+            "password1234!",
+            "홍길동",
+            MemberRole.CLASSMATE,
+        )
+
+        // Act
+        val result = service.signup(command)
+
+        // Assert
+        assertThat(result.email).isEqualTo(command.email)
+        assertThat(writer.signupCommands).containsExactly(command)
+    }
+
+    @Test
+    fun `세션 요청은 쓰기 처리기에 맡긴다`() {
+        // Arrange
+        val writer = RecordingMemberAuthWriter()
+        val service = MemberAuthService(
+            writer,
+            RecordingMemberAuthReader(),
+        )
+        val loginCommand = LoginCommand("student@example.com", "password1234!")
+        val refreshCommand = RefreshTokenCommand("refresh-token")
+        val logoutCommand = LogoutCommand(1L, "access-token")
+
+        // Act
+        service.login(loginCommand)
+        service.refresh(refreshCommand)
+        service.logout(logoutCommand)
+
+        // Assert
+        assertThat(writer.loginCommands).containsExactly(loginCommand)
+        assertThat(writer.refreshCommands).containsExactly(refreshCommand)
+        assertThat(writer.logoutCommands).containsExactly(logoutCommand)
+    }
+
+    @Test
+    fun `현재 회원 조회 요청은 읽기 처리기에 맡긴다`() {
+        // Arrange
+        val reader = RecordingMemberAuthReader()
+        val service = MemberAuthService(
+            RecordingMemberAuthWriter(),
+            reader,
+        )
+
+        // Act
+        val byId = service.getCurrentUser(1L)
+        val byEmail = service.getCurrentUserByEmail("student@example.com")
+
+        // Assert
+        assertThat(byId.id).isEqualTo(1L)
+        assertThat(byEmail.email).isEqualTo("student@example.com")
+        assertThat(reader.requestedUserIds).containsExactly(1L)
+        assertThat(reader.requestedEmails).containsExactly("student@example.com")
+    }
     private val members = FakeMemberRepository()
     private val refreshTokens = FakeRefreshTokenRepository()
     private val passwordHashEncoder = FakePasswordHashEncoder()
@@ -28,14 +94,17 @@ class MemberAuthServiceTest {
     private val authTokenProperties = AuthTokenProperties("test-salt", 1800, 604800)
     private val service =
         MemberAuthService(
-            members,
-            refreshTokens,
-            passwordHashEncoder,
-            tokenGenerator,
-            tokenVerifier,
-            tokenExpirationResolver,
-            accessTokenBlacklistRepository,
-            authTokenProperties,
+            MemberAuthRepositoryWriter(
+                members,
+                refreshTokens,
+                passwordHashEncoder,
+                tokenGenerator,
+                tokenVerifier,
+                tokenExpirationResolver,
+                accessTokenBlacklistRepository,
+                authTokenProperties,
+            ),
+            MemberRepositoryReader(members),
         )
 
     @Test
@@ -299,6 +368,33 @@ class MemberAuthServiceTest {
             .hasMessage("회원 정보를 찾을 수 없습니다.")
     }
 
+    @Test
+    fun `현재 사용자 이메일 조회는 활성 회원을 반환한다`() {
+        val member = service.signup(
+            SignupCommand(
+                "student@example.com",
+                "password1234!",
+                "홍길동",
+                MemberRole.CLASSMATE,
+            ),
+        )
+
+        val result = service.getCurrentUserByEmail("student@example.com")
+
+        assertThat(result.id).isEqualTo(member.userId)
+        assertThat(result.email).isEqualTo("student@example.com")
+        assertThat(result.name).isEqualTo("홍길동")
+        assertThat(result.role).isEqualTo(MemberRole.CLASSMATE)
+        assertThat(result.status).isEqualTo(MemberStatus.ACTIVE)
+    }
+
+    @Test
+    fun `현재 사용자 이메일 조회는 알 수 없는 사용자를 거부한다`() {
+        assertThatThrownBy { service.getCurrentUserByEmail("missing@example.com") }
+            .isInstanceOf(BusinessException::class.java)
+            .hasMessage("회원 정보를 찾을 수 없습니다.")
+    }
+
     private class FakeMemberRepository : MemberRepository {
         private val members = linkedMapOf<Long, MemberModel>()
         private var nextId = 1L
@@ -384,12 +480,12 @@ class MemberAuthServiceTest {
 
     private class FakeTokenGenerator : TokenGenerator {
         override fun generate(
-            memberId: Long?,
+            memberId: Long,
             roles: Set<String>,
         ): AuthTokenValue = AuthTokenValue(
-            accessToken = "access-$memberId",
-            refreshToken = "refresh-$memberId",
-            expiresIn = 1800,
+            "access-$memberId",
+            "refresh-$memberId",
+            1800,
         )
     }
 
@@ -424,5 +520,84 @@ class MemberAuthServiceTest {
         override fun contains(token: String): Boolean = tokens.containsKey(token)
 
         fun ttlOf(token: String): Duration? = tokens[token]
+    }
+
+    private class RecordingMemberAuthWriter : MemberAuthWriter {
+        val signupCommands = mutableListOf<SignupCommand>()
+        val loginCommands = mutableListOf<LoginCommand>()
+        val refreshCommands = mutableListOf<RefreshTokenCommand>()
+        val logoutCommands = mutableListOf<LogoutCommand>()
+
+        override fun signup(command: SignupCommand): SignupResult {
+            signupCommands += command
+            return SignupResult(
+                userId = 1L,
+                email = command.email,
+                name = command.name,
+                role = command.role,
+            )
+        }
+
+        override fun login(command: LoginCommand): LoginResult {
+            loginCommands += command
+            return LoginResult(
+                accessToken = "access-token",
+                refreshToken = "refresh-token",
+                tokenType = "Bearer",
+                expiresIn = 1800,
+                user = memberSummary(email = command.email),
+            )
+        }
+
+        override fun refresh(command: RefreshTokenCommand): RefreshTokenResult {
+            refreshCommands += command
+            return RefreshTokenResult(
+                accessToken = "access-token",
+                tokenType = "Bearer",
+                expiresIn = 1800,
+            )
+        }
+
+        override fun logout(command: LogoutCommand) {
+            logoutCommands += command
+        }
+    }
+
+    private class RecordingMemberAuthReader : MemberAuthReader {
+        val requestedUserIds = mutableListOf<Long>()
+        val requestedEmails = mutableListOf<String>()
+
+        override fun getCurrentUser(userId: Long): CurrentMemberResult {
+            requestedUserIds += userId
+            return currentMemberResult(id = userId)
+        }
+
+        override fun getCurrentUserByEmail(email: String): CurrentMemberResult {
+            requestedEmails += email
+            return currentMemberResult(email = email)
+        }
+    }
+
+    private companion object {
+        fun memberSummary(
+            id: Long = 1L,
+            email: String = "student@example.com",
+        ): MemberSummary = MemberSummary(
+            id = id,
+            email = email,
+            name = "홍길동",
+            role = MemberRole.CLASSMATE,
+        )
+
+        fun currentMemberResult(
+            id: Long = 1L,
+            email: String = "student@example.com",
+        ): CurrentMemberResult = CurrentMemberResult(
+            id = id,
+            email = email,
+            name = "홍길동",
+            role = MemberRole.CLASSMATE,
+            status = MemberStatus.ACTIVE,
+        )
     }
 }

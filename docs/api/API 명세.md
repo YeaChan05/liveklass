@@ -17,6 +17,25 @@
 -H "Authorization: Bearer {accessToken}"
 ```
 
+
+---
+
+## Swagger / OpenAPI
+
+- Swagger UI: `GET /swagger-ui.html` 또는 `GET /swagger-ui/index.html`
+- OpenAPI JSON: `GET /v3/api-docs`
+- OpenAPI YAML: `GET /v3/api-docs.yaml`
+- 위 문서 endpoint는 API 탐색용 공개 endpoint이므로 인증 토큰 없이 접근할 수 있습니다.
+- 실제 업무 API의 인증 정책은 변경하지 않으며, 공개되지 않은 경로는 기존처럼 공통 보안 fallback에 의해 인증이 필요합니다.
+
+```bash
+curl -X GET "http://localhost:8080/v3/api-docs"
+```
+
+```bash
+curl -X GET "http://localhost:8080/swagger-ui.html"
+```
+
 ---
 
 ## 인증 API
@@ -207,6 +226,9 @@ curl -X POST "http://localhost:8080/api/courses/1/close" \
     - 모집 중인 `OPEN` 상태의 강의에만 신청할 수 있습니다.
     - 수강 신청 성공 시 `Enrollment`를 `PENDING` 상태로 생성합니다.
     - 수강 신청 성공 시 `seatLeftCount`를 감소시킵니다.
+    - 정원이 가득 찬 경우 대기열에 등록하고 `WAITLISTED` 응답을 반환합니다.
+    - `PENDING` 또는 `CONFIRMED` 신청이 이미 있으면 기존 신청 결과를 반환합니다.
+    - `CANCELLED` 또는 `EXPIRED` 신청만 있으면 다시 신청할 수 있습니다.
     - 매핑: `EnrollmentController.enroll()`
     - 요청 예시:
 
@@ -214,6 +236,28 @@ curl -X POST "http://localhost:8080/api/courses/1/close" \
 curl -X POST "http://localhost:8080/api/courses/1/enrollments" \
   -H "X-API-Version: v1" \
   -H "Authorization: Bearer classmate-access-token-value"
+```
+
+    - 신청 성공 응답 예시:
+
+```json
+{
+  "enrollmentId": 1,
+  "courseId": 1,
+  "memberId": 2,
+  "status": "PENDING"
+}
+```
+
+    - 대기열 등록 응답 예시:
+
+```json
+{
+  "enrollmentId": null,
+  "courseId": 1,
+  "memberId": 2,
+  "status": "WAITLISTED"
+}
 ```
 
 ---
@@ -238,6 +282,7 @@ curl -X POST "http://localhost:8080/api/enrollments/1/confirm" \
     - 결제 대기 상태의 신청만 취소할 수 있습니다.
     - `PENDING -> CANCELLED` 상태 전이를 수행합니다.
     - 수강 취소 성공 시 `seatLeftCount`를 증가시킵니다.
+    - 수강 취소 성공 시 해당 강의의 sold-out 상태를 해제합니다.
     - `CONFIRMED` 상태의 신청은 취소할 수 없습니다.
     - 매핑: `EnrollmentController.cancelEnrollment()`
     - 요청 예시:
@@ -259,6 +304,30 @@ curl -X GET "http://localhost:8080/api/enrollments/me" \
   -H "Authorization: Bearer classmate-access-token-value"
 ```
 
+- [`GET /api/enrollments/waitlist/me`](/course/api/src/main/kotlin/org/yechan/enrollment/EnrollmentController.kt)
+    - 현재 로그인한 회원의 대기열 상태를 SSE로 조회합니다.
+    - 대기열 상태는 아직 좌석을 점유한 수강 신청이 아닙니다.
+    - 매핑: `EnrollmentController.getMyWaitlist()`
+    - 요청 예시:
+
+```bash
+curl -X GET "http://localhost:8080/api/enrollments/waitlist/me" \
+  -H "X-API-Version: v1" \
+  -H "Authorization: Bearer classmate-access-token-value"
+```
+
+- [`DELETE /api/enrollments/waitlist/{courseId}`](/course/api/src/main/kotlin/org/yechan/enrollment/EnrollmentController.kt)
+    - 현재 로그인한 회원의 해당 강의 대기열을 취소합니다.
+    - 성공 시 `204 No Content`를 반환합니다.
+    - 매핑: `EnrollmentController.cancelWaitlist()`
+    - 요청 예시:
+
+```bash
+curl -X DELETE "http://localhost:8080/api/enrollments/waitlist/1" \
+  -H "X-API-Version: v1" \
+  -H "Authorization: Bearer classmate-access-token-value"
+```
+
 ---
 
 ### 참고 사항
@@ -272,6 +341,11 @@ curl -X GET "http://localhost:8080/api/enrollments/me" \
 - 강의 목록 조회의 `status` query parameter는 선택 값입니다.
 - `status` query parameter가 없으면 전체 강의를 조회합니다.
 - 수강 신청은 성공 시 `PENDING` 상태로 생성됩니다.
+- 수강 신청은 정원이 가득 차면 대기열 등록 응답을 반환합니다.
+- 대기열 등록 응답의 `enrollmentId`는 `null`이고 `status`는 `WAITLISTED`입니다.
+- `PENDING` 또는 `CONFIRMED` 신청이 있으면 중복 신청으로 보고 새 신청을 만들지 않습니다.
+- `CANCELLED` 또는 `EXPIRED` 신청만 있으면 다시 신청할 수 있습니다.
+- 대기열에 등록된 신청은 `DELETE /api/enrollments/waitlist/{courseId}`로 취소할 수 있습니다.
 - 결제 확정은 `PENDING -> CONFIRMED` 상태 변경으로 처리합니다.
 - 수강 취소는 `PENDING -> CANCELLED` 상태 변경으로 처리합니다.
 - `CONFIRMED` 상태의 수강 신청은 취소할 수 없습니다.

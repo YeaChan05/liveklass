@@ -202,9 +202,8 @@ dependencies {
 }
 ```
 
-현재는 `member:application`, `account:application`, `transfer:application`이 각 도메인 application 역할을 가진다.
-`application-root`는 전체 조합을 로컬에서 띄워 보기 위한 runnable application으로만 둔다.
-`application-root`는 same-process 조합을 위해 provider-side `api-internal` bean을 직접 포함할 수 있지만,
+현재 저장소에서는 runnable application 모듈이 전체 조합 지점 역할을 맡는다.
+same-process 조합을 위해 provider-side `api-internal` bean을 직접 포함할 수 있지만,
 이 예외를 core/service/infrastructure 의존 허용으로 해석하면 안 된다.
 ---
 
@@ -261,5 +260,4 @@ graph LR
 
 이 규칙을 지키면,
 모듈 수가 늘어나도 의존 방향은 절대 무너지지 않는다.
-
 

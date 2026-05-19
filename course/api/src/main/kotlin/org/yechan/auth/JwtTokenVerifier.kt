@@ -32,7 +32,7 @@ class JwtTokenVerifier(
             val subject = claims.subject ?: throw BadCredentialsException("Invalid token subject")
             val authorities = (claims[ROLES_CLAIM] as? Collection<*>)
                 .orEmpty()
-                .mapNotNull { it as? String }
+                .filterIsInstance<String>()
                 .map { SimpleGrantedAuthority("ROLE_$it") }
             return UsernamePasswordAuthenticationToken(subject, token, authorities)
         } catch (e: JwtException) {

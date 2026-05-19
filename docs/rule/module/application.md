@@ -51,9 +51,8 @@ fun main(args: Array<String>) {
 
 ## gradle.properties
 
-- `type=kotlin-boot-mvc-application`
+- `type=kotlin-boot-application`
 - `group={base-package}.{domain}`
-- `label=docker`
 
 ## Test
 

@@ -6,6 +6,7 @@ dependencies {
     // internal
     implementation(project(":course:api"))
     implementation(project(":course:repository-jpa"))
+    implementation(project(":course:repository-jdbc"))
     implementation(project(":course:repository-redis"))
     implementation(project(":course:schema"))
 
@@ -15,9 +16,6 @@ dependencies {
 
     // spring boot dev tools
     runtimeOnly("org.springframework.boot:spring-boot-docker-compose")
-
-    // spring liquibase org.liquibase:liquibase-gradle-plugin
-    implementation("org.springframework.boot:spring-boot-starter-liquibase")
 
     // observability
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")

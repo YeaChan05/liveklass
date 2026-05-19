@@ -87,6 +87,7 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.email").isEqualTo("student@example.com")
             .jsonPath("$.name").isEqualTo("홍길동")
             .jsonPath("$.role").isEqualTo("CLASSMATE")
+            .jsonPath("$._links.login.href").exists()
     }
 
     @Test
@@ -120,7 +121,7 @@ class MemberAuthControllerTest @Autowired constructor(
 
     @Test
     fun `로그인 리프레시 내 정보 조회는 필요한 응답을 노출한다`() {
-        val accessToken = tokenGenerator.generate(1L, roles = emptySet()).accessToken
+        val accessToken = tokenGenerator.generate(1L, emptySet()).accessToken
 
         restTestClient.post()
             .uri("/api/auth/login")
@@ -135,6 +136,9 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.tokenType").isEqualTo("Bearer")
             .jsonPath("$.expiresIn").isEqualTo(1800)
             .jsonPath("$.user.role").isEqualTo("CLASSMATE")
+            .jsonPath("$._links.me.href").exists()
+            .jsonPath("$._links.refresh.href").exists()
+            .jsonPath("$._links.logout.href").exists()
 
         restTestClient.post()
             .uri("/api/auth/token/refresh")
@@ -147,6 +151,8 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.accessToken").isEqualTo("access-1-new")
             .jsonPath("$.tokenType").isEqualTo("Bearer")
             .jsonPath("$.expiresIn").isEqualTo(1800)
+            .jsonPath("$._links.me.href").exists()
+            .jsonPath("$._links.refresh.href").exists()
 
         val beforeRefreshCalls = memberAuthService.refreshCalls
         restTestClient.post()
@@ -175,11 +181,13 @@ class MemberAuthControllerTest @Autowired constructor(
             .jsonPath("$.name").isEqualTo("홍길동")
             .jsonPath("$.role").isEqualTo("CLASSMATE")
             .jsonPath("$.status").isEqualTo("ACTIVE")
+            .jsonPath("$._links.self.href").exists()
+            .jsonPath("$._links.logout.href").exists()
     }
 
     @Test
     fun `로그아웃은 인증된 액세스 토큰을 전달한다`() {
-        val accessToken = tokenGenerator.generate(1L, roles = emptySet()).accessToken
+        val accessToken = tokenGenerator.generate(1L, emptySet()).accessToken
 
         restTestClient.post()
             .uri("/api/auth/logout")

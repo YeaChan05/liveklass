@@ -46,12 +46,23 @@
 - 구현체
 
     - `DomainService`
-    - `DomainQueryService`
+
+- 구현 도구
+
+    - `DomainReader`
+    - `DomainWriter`
+    - `DomainRepositoryReader`
+    - `DomainRepositoryWriter`
+    - `DomainProcessor`
 
 규칙
 
 - UseCase 단위로 책임 분리
 - Service는 반드시 UseCase 인터페이스를 구현
+- Service는 사용자 요청 기반의 비즈니스 흐름을 표현
+- Reader는 반드시 읽기 전용
+- Writer는 쓰기 중심이며 조회 API를 노출하지 않음
+- Scheduler는 전용 UseCase 또는 Service만 호출
 
 ---
 
@@ -194,7 +205,7 @@
 - 비즈니스 로직 포함 x
 - Bean 조립, 설정, 실행만 담당
 
-현재는 application-root만 runnable
+현재는 runnable application 모듈만 존재한다
 
 ---
 

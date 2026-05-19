@@ -22,13 +22,12 @@ class JwtTokenGenerator(
     }
 
     override fun generate(
-        memberId: Long?,
+        memberId: Long,
         roles: Set<String>,
     ): AuthTokenValue {
         val issuedAt = Instant.now()
-        val actualMemberId = requireNotNull(memberId)
-        val accessToken = createToken(actualMemberId, roles, issuedAt, accessExpiresIn)
-        val refreshToken = createToken(actualMemberId, roles, issuedAt, refreshExpiresIn)
+        val accessToken = createToken(memberId, roles, issuedAt, accessExpiresIn)
+        val refreshToken = createToken(memberId, roles, issuedAt, refreshExpiresIn)
         return AuthTokenValue(accessToken, refreshToken, accessExpiresIn)
     }
 

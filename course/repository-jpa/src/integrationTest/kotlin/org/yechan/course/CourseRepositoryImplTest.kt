@@ -13,7 +13,6 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.TestPropertySource
 import org.yechan.enrollment.EnrollmentEntity
 import org.yechan.member.MemberEntity
 import java.time.LocalDateTime
@@ -22,16 +21,6 @@ import java.time.LocalDateTime
 @Import(CourseRepositoryImpl::class)
 @ContextConfiguration(classes = [CourseRepositoryImplTest.TestApplication::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(
-    properties = [
-        "spring.datasource.url=jdbc:tc:mysql:8.4.8://localhost:3306/course_repository_test?useSSL=false&serverTimezone=UTC&TC_DAEMON=true",
-        "spring.datasource.driver-class-name=org.testcontainers.jdbc.ContainerDatabaseDriver",
-        "spring.datasource.username=root",
-        "spring.datasource.password=password",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.liquibase.enabled=false",
-    ],
-)
 class CourseRepositoryImplTest {
     @Autowired
     private lateinit var courseRepository: CourseRepositoryImpl

@@ -185,6 +185,14 @@ class EnrollmentModelTest {
     }
 
     @Test
+    fun `내 수강 신청 내역 노출 상태를 판단할 수 있다`() {
+        Assertions.assertThat(enrollment(status = EnrollmentStatus.PENDING).isVisibleInMyEnrollmentHistory()).isFalse()
+        Assertions.assertThat(enrollment(status = EnrollmentStatus.CONFIRMED).isVisibleInMyEnrollmentHistory()).isTrue()
+        Assertions.assertThat(enrollment(status = EnrollmentStatus.CANCELLED).isVisibleInMyEnrollmentHistory()).isTrue()
+        Assertions.assertThat(enrollment(status = EnrollmentStatus.EXPIRED).isVisibleInMyEnrollmentHistory()).isFalse()
+    }
+
+    @Test
     fun `결제 대기 만료 시각은 결제 대기 시작 시각보다 이후여야 한다`() {
         Assertions.assertThatThrownBy {
             EnrollmentModelData(

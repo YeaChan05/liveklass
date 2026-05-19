@@ -15,4 +15,5 @@ scrape_configs:
         labels:
           job: spring
           app: course-api
+          compose_service: app-course-api
           __path__: /logs/*.log

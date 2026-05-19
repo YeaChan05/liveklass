@@ -2,6 +2,8 @@ package org.yechan.enrollment
 
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hibernate.exception.ConstraintViolationException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,7 +15,6 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.TestPropertySource
 import org.yechan.course.CourseEntity
 import org.yechan.course.CourseJpaRepository
 import org.yechan.course.CourseModelData
@@ -29,16 +30,6 @@ import java.time.LocalDateTime
 @Import(EnrollmentRepositoryImpl::class)
 @ContextConfiguration(classes = [EnrollmentRepositoryImplTest.TestApplication::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(
-    properties = [
-        "spring.datasource.url=jdbc:tc:mysql:8.4.8://localhost:3306/course_repository_test?useSSL=false&serverTimezone=UTC&TC_DAEMON=true",
-        "spring.datasource.driver-class-name=org.testcontainers.jdbc.ContainerDatabaseDriver",
-        "spring.datasource.username=root",
-        "spring.datasource.password=password",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.liquibase.enabled=false",
-    ],
-)
 class EnrollmentRepositoryImplTest {
     @Autowired
     private lateinit var enrollmentRepository: EnrollmentRepositoryImpl
@@ -67,7 +58,6 @@ class EnrollmentRepositoryImplTest {
                 memberId = member.id!!,
                 status = EnrollmentStatus.PENDING,
             ),
-            courseId = course.id!!,
         )
 
         assertThat(saved.enrollmentId).isNotNull()
@@ -87,7 +77,6 @@ class EnrollmentRepositoryImplTest {
                 memberId = member.id!!,
                 status = EnrollmentStatus.CONFIRMED,
             ),
-            courseId = course.id!!,
         )
 
         val found = enrollmentRepository.findById(saved.enrollmentId!!)
@@ -101,23 +90,150 @@ class EnrollmentRepositoryImplTest {
     }
 
     @Test
-    fun `회원 아이디 조회는 해당 회원의 수강 신청만 반환한다`() {
+    fun `회원 아이디 조회는 해당 회원의 수강 신청 목록을 반환한다`() {
         val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
         val member = persistMember(email = "student@example.com")
         val otherMember = persistMember(email = "other@example.com")
         val course = persistCourse(creator)
         val memberEnrollment = enrollmentRepository.save(
             EnrollmentModelData(courseId = course.id!!, memberId = member.id!!),
-            courseId = course.id!!,
         )
         enrollmentRepository.save(
             EnrollmentModelData(courseId = course.id!!, memberId = otherMember.id!!),
-            courseId = course.id!!,
         )
 
         val enrollments = enrollmentRepository.findByMemberId(member.id!!)
 
         assertThat(enrollments).containsExactly(memberEnrollment)
+    }
+
+    @Test
+    fun `회원 수강 신청 내역 조회는 확정과 취소 상태만 반환한다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val pendingCourse = persistCourse(creator)
+        val confirmedCourse = persistCourse(creator)
+        val cancelledCourse = persistCourse(creator)
+        val expiredCourse = persistCourse(creator)
+        enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = pendingCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        val confirmed = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = confirmedCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.CONFIRMED,
+            ),
+        )
+        val cancelled = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = cancelledCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.CANCELLED,
+            ),
+        )
+        enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = expiredCourse.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val histories = enrollmentRepository.findHistoriesByMemberId(member.id!!)
+
+        assertThat(histories).containsExactlyInAnyOrder(confirmed, cancelled)
+    }
+
+    @Test
+    fun `회원은 서로 다른 강의에 각각 신청할 수 있다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val firstCourse = persistCourse(creator)
+        val secondCourse = persistCourse(creator)
+        val firstEnrollment = enrollmentRepository.save(
+            EnrollmentModelData(courseId = firstCourse.id!!, memberId = member.id!!),
+        )
+        val secondEnrollment = enrollmentRepository.save(
+            EnrollmentModelData(courseId = secondCourse.id!!, memberId = member.id!!),
+        )
+
+        val enrollments = enrollmentRepository.findByMemberId(member.id!!)
+        val found = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = secondCourse.id!!,
+        )
+
+        assertThat(enrollments).containsExactly(firstEnrollment, secondEnrollment)
+        assertThat(found).isEqualTo(secondEnrollment)
+    }
+
+    @Test
+    fun `같은 강의와 회원의 중복 신청은 저장되지 않는다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val course = persistCourse(creator)
+
+        val pending = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        assertThatThrownBy {
+            enrollmentRepository.save(
+                EnrollmentModelData(
+                    courseId = course.id!!,
+                    memberId = member.id!!,
+                    status = EnrollmentStatus.EXPIRED,
+                ),
+            )
+            entityManager.flush()
+        }.isInstanceOf(ConstraintViolationException::class.java)
+
+        entityManager.clear()
+        val enrollment = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = course.id!!,
+        )
+
+        assertThat(enrollment).isEqualTo(pending)
+    }
+
+    @Test
+    fun `같은 row id로 저장하면 상태를 갱신할 수 있다`() {
+        val creator = persistMember(email = "creator@example.com", role = MemberRole.CREATOR)
+        val member = persistMember(email = "student@example.com")
+        val course = persistCourse(creator)
+
+        val pending = enrollmentRepository.save(
+            EnrollmentModelData(
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.PENDING,
+            ),
+        )
+        val expired = enrollmentRepository.save(
+            EnrollmentModelData(
+                enrollmentId = pending.enrollmentId,
+                courseId = course.id!!,
+                memberId = member.id!!,
+                status = EnrollmentStatus.EXPIRED,
+            ),
+        )
+
+        val enrollment = enrollmentRepository.findByMemberIdAndCourseId(
+            memberId = member.id!!,
+            courseId = course.id!!,
+        )
+
+        assertThat(expired.enrollmentId).isEqualTo(pending.enrollmentId)
+        assertThat(enrollment).isEqualTo(expired)
     }
 
     private fun persistMember(

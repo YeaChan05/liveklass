@@ -1,8 +1,11 @@
+org.yechan.CourseApiHateoasAutoConfiguration
 org.yechan.ActuatorOpenEndpointPolicy
+org.yechan.SwaggerOpenEndpointPolicy
 org.yechan.auth.JwtAutoConfiguration
 org.yechan.member.MemberAuthenticationProviderAutoConfiguration
 org.yechan.member.MemberAuthOpenEndpointPolicy
 org.yechan.course.CourseOpenEndpointPolicy
 org.yechan.course.CourseAuthorizationPolicy
 org.yechan.course.CourseRoleHierarchyConfiguration
+org.yechan.enrollment.EnrollmentApiConfiguration
 org.yechan.enrollment.EnrollmentAuthorizationPolicy

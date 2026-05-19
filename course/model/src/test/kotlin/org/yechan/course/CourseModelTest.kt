@@ -27,7 +27,7 @@ class CourseModelTest {
         val exception = assertThrows(CourseInvalidStateException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
-        assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
+        assertEquals("모집중인 강의가 아닙니다.", exception.message)
     }
 
     @Test
@@ -45,7 +45,7 @@ class CourseModelTest {
     fun `초안 강의는 모집 전 마감할 수 없다`() {
         val exception = assertThrows(CourseInvalidStateException::class.java) { course().close() }
 
-        assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
+        assertEquals("모집중인 강의가 아닙니다.", exception.message)
     }
 
     @Test
@@ -74,7 +74,7 @@ class CourseModelTest {
         val exception = assertThrows(CourseInvalidStateException::class.java) {
             course.requestEnrollment(memberId = 1L, currentEnrollmentCount = 0)
         }
-        assertEquals("모집 중인 강의만 마감할 수 있습니다.", exception.message)
+        assertEquals("모집중인 강의가 아닙니다.", exception.message)
     }
 
     @Test
