@@ -26,10 +26,7 @@ class ApiResponseHttpMessageConverterTest {
             .build()
 
     private val converter =
-        ApiResponseHttpMessageConverter(
-            objectMapper = objectMapper,
-            clock = clock,
-        )
+        ApiResponseHttpMessageConverter(objectMapper, clock)
 
     @Test
     fun `성공 응답은 success true와 body와 timestamp로 감싼다`() {
@@ -86,11 +83,12 @@ class ApiResponseHttpMessageConverterTest {
 
         converter.write(
             ApiSuccessResponse(
-                body = TestResponse(
+                true,
+                LocalDateTime.of(2026, 5, 12, 10, 0),
+                TestResponse(
                     id = 10L,
                     name = "already-wrapped",
                 ),
-                timestamp = LocalDateTime.of(2026, 5, 12, 10, 0),
             ),
             MediaType.APPLICATION_JSON,
             outputMessage,

@@ -19,7 +19,7 @@ class SwaggerOpenEndpointPolicy :
     })
 
 private fun swaggerApplicationOpenEndpointPolicy(): StaticApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-    additionalMatchers =
+    false,
     listOf(
         OpenEndpointMatcher(HttpMethod.GET, "/v3/api-docs"),
         OpenEndpointMatcher(HttpMethod.GET, "/v3/api-docs/**"),

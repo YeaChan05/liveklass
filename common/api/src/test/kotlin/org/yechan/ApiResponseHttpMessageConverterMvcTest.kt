@@ -129,10 +129,7 @@ class ApiResponseHttpMessageConverterMvcTest {
                     builder.configureMessageConvertersList { converters ->
                         converters.add(
                             0,
-                            ApiResponseHttpMessageConverter(
-                                objectMapper = objectMapper,
-                                clock = clock,
-                            ),
+                            ApiResponseHttpMessageConverter(objectMapper, clock),
                         )
                     }
                 }

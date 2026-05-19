@@ -35,7 +35,7 @@ class ApiHateoasHttpMessageConverterMvcTest {
     fun `컨트롤러가 원본 DTO를 반환해도 공통 MessageConverter가 HATEOAS 링크를 추가한다`() {
         val result = mockMvc.get("/hateoas-test/single") {
             accept = MediaType.APPLICATION_JSON
-            header(API_VERSION_HEADER, "v1")
+            header(HeaderConst.API_VERSION_HEADER, "v1")
         }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value(1) }
@@ -50,7 +50,7 @@ class ApiHateoasHttpMessageConverterMvcTest {
     fun `목록 응답은 각 원소에 HATEOAS 링크를 추가한다`() {
         mockMvc.get("/hateoas-test/list") {
             accept = MediaType.APPLICATION_JSON
-            header(API_VERSION_HEADER, "v1")
+            header(HeaderConst.API_VERSION_HEADER, "v1")
         }.andExpect {
             status { isOk() }
             jsonPath("$[0].id") { value(1) }

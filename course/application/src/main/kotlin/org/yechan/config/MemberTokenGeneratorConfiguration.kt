@@ -83,8 +83,8 @@ class MemberTokenGenerator(
                     val accessToken =
                         tokenGenerator
                             .generate(
-                                memberId = member.id,
-                                roles = setOf(properties.role),
+                                member.id,
+                                setOf(properties.role),
                             )
                             .accessToken
 

@@ -107,7 +107,7 @@ class MemberAuthRepositoryWriter(
         }
 
         val memberId = requireNotNull(member.memberId)
-        val token = tokenGenerator.generate(memberId, roles = setOf(member.role.name))
+        val token = tokenGenerator.generate(memberId, setOf(member.role.name))
         refreshTokenRepository.replace(
             RefreshTokenModelData(
                 userId = memberId,
@@ -145,7 +145,7 @@ class MemberAuthRepositoryWriter(
             ?: throw InvalidRefreshTokenException()
         member.validateMemberStatus()
 
-        val token = tokenGenerator.generate(requireNotNull(member.memberId), roles = setOf(member.role.name))
+        val token = tokenGenerator.generate(requireNotNull(member.memberId), setOf(member.role.name))
         return RefreshTokenResult(
             accessToken = token.accessToken,
             tokenType = TOKEN_TYPE,

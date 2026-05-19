@@ -483,9 +483,9 @@ class MemberAuthServiceTest {
             memberId: Long?,
             roles: Set<String>,
         ): AuthTokenValue = AuthTokenValue(
-            accessToken = "access-$memberId",
-            refreshToken = "refresh-$memberId",
-            expiresIn = 1800,
+            "access-$memberId",
+            "refresh-$memberId",
+            1800,
         )
     }
 

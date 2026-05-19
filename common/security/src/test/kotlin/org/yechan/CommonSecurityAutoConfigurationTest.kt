@@ -233,9 +233,9 @@ class CommonSecurityAutoConfigurationTest {
 
         @Bean
         fun applicationOpenEndpointPolicy(): ApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-            additionalMatchers =
+            false,
             listOf(
-                OpenEndpointMatcher(pattern = "/open"),
+                OpenEndpointMatcher(null, "/open"),
             ),
         )
 

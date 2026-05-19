@@ -22,7 +22,7 @@ class MemberAuthOpenEndpointPolicy :
     })
 
 private fun memberApplicationOpenEndpointPolicy(): StaticApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-    additionalMatchers =
+    false,
     listOf(
         OpenEndpointMatcher(HttpMethod.POST, "/api/auth/signup"),
         OpenEndpointMatcher(HttpMethod.POST, "/api/auth/login"),

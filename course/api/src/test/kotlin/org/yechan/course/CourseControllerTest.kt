@@ -59,7 +59,7 @@ class CourseControllerTest @Autowired constructor(
     @Test
     fun `강의 등록 모집 시작 마감 목록 상세 API를 제공한다`() {
         val accessToken =
-            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+            tokenGenerator.generate(1L, setOf(MemberRole.CREATOR.name)).accessToken
 
         createCourse(
             accessToken = accessToken,
@@ -140,7 +140,7 @@ class CourseControllerTest @Autowired constructor(
     @Test
     fun `강의 목록 조회는 상태 파라미터가 없으면 전체 강의를 조회한다`() {
         val accessToken =
-            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+            tokenGenerator.generate(1L, setOf(MemberRole.CREATOR.name)).accessToken
 
         createCourse(accessToken = accessToken, title = "Draft Course")
         createCourse(accessToken = accessToken, title = "Open Course")
@@ -168,7 +168,7 @@ class CourseControllerTest @Autowired constructor(
     @Test
     fun `강의 목록 조회는 상태 파라미터로 필터링할 수 있다`() {
         val accessToken =
-            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+            tokenGenerator.generate(1L, setOf(MemberRole.CREATOR.name)).accessToken
 
         createCourse(accessToken = accessToken, title = "Draft Course")
         createCourse(accessToken = accessToken, title = "Open Course")
@@ -212,7 +212,7 @@ class CourseControllerTest @Autowired constructor(
     @Test
     fun `수강생은 강의 등록 모집 시작 마감 API를 사용할 수 없다`() {
         val accessToken =
-            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+            tokenGenerator.generate(2L, setOf(MemberRole.CLASSMATE.name)).accessToken
 
         restTestClient.post()
             .uri("/api/courses")
@@ -287,7 +287,7 @@ class CourseControllerTest @Autowired constructor(
     @WithMockUser(username = "admin", roles = ["CREATOR"])
     fun `CREATOR는 강의 등록 모집 시작 마감 API를 사용할 수 있다`() {
         val accessToken =
-            tokenGenerator.generate(3L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+            tokenGenerator.generate(3L, setOf(MemberRole.CREATOR.name)).accessToken
 
         createCourse(
             accessToken = accessToken,

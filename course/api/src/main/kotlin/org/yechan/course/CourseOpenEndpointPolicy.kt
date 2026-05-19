@@ -24,7 +24,7 @@ class CourseOpenEndpointPolicy :
     })
 
 private fun courseApplicationOpenEndpointPolicy(): StaticApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-    additionalMatchers =
+    false,
     listOf(
         OpenEndpointMatcher(HttpMethod.GET, "/api/courses"),
         OpenEndpointMatcher(HttpMethod.GET, "/api/courses/{courseId}"),

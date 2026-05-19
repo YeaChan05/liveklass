@@ -19,7 +19,7 @@ class ActuatorOpenEndpointPolicy :
     })
 
 private fun actuatorOpenEndpointPolicy(): StaticApplicationOpenEndpointPolicy = StaticApplicationOpenEndpointPolicy(
-    additionalMatchers =
+    false,
     listOf(
         OpenEndpointMatcher(HttpMethod.GET, "/actuator/health"),
         OpenEndpointMatcher(HttpMethod.GET, "/actuator/info"),

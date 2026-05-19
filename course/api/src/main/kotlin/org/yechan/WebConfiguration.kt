@@ -7,6 +7,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebConfiguration : WebMvcConfigurer {
     override fun configureApiVersioning(configurer: ApiVersionConfigurer) {
-        configurer.useRequestHeader(API_VERSION_HEADER)
+        configurer.useRequestHeader(HeaderConst.API_VERSION_HEADER)
     }
 }

@@ -49,7 +49,7 @@ class EnrollmentControllerTest @Autowired constructor(
     @Test
     fun `수강 신청 결제 확정 취소 내 신청 목록 API를 제공한다`() {
         val accessToken =
-            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+            tokenGenerator.generate(2L, setOf(MemberRole.CLASSMATE.name)).accessToken
 
         restTestClient.post()
             .uri("/api/courses/1/enrollments")
@@ -96,7 +96,7 @@ class EnrollmentControllerTest @Autowired constructor(
     @Test
     fun `정원이 가득 찬 경우 대기열 등록 응답을 반환한다`() {
         val accessToken =
-            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+            tokenGenerator.generate(2L, setOf(MemberRole.CLASSMATE.name)).accessToken
 
         restTestClient.post()
             .uri("/api/courses/999/enrollments")
@@ -117,7 +117,7 @@ class EnrollmentControllerTest @Autowired constructor(
     @Test
     fun `대기열 조회 SSE 응답을 반환한다`() {
         val accessToken =
-            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+            tokenGenerator.generate(2L, setOf(MemberRole.CLASSMATE.name)).accessToken
 
         restTestClient.get()
             .uri("/api/enrollments/waitlist/me")
@@ -137,7 +137,7 @@ class EnrollmentControllerTest @Autowired constructor(
     @Test
     fun `대기열 취소 API를 제공한다`() {
         val accessToken =
-            tokenGenerator.generate(2L, roles = setOf(MemberRole.CLASSMATE.name)).accessToken
+            tokenGenerator.generate(2L, setOf(MemberRole.CLASSMATE.name)).accessToken
 
         restTestClient.delete()
             .uri("/api/enrollments/waitlist/999")
@@ -150,7 +150,7 @@ class EnrollmentControllerTest @Autowired constructor(
     @Test
     fun `CREATOR도 수강 신청 API를 사용할 수 있다`() {
         val accessToken =
-            tokenGenerator.generate(1L, roles = setOf(MemberRole.CREATOR.name)).accessToken
+            tokenGenerator.generate(1L, setOf(MemberRole.CREATOR.name)).accessToken
 
         restTestClient.post()
             .uri("/api/courses/1/enrollments")

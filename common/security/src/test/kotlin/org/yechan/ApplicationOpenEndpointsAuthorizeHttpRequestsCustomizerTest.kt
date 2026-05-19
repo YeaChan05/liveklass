@@ -3,6 +3,8 @@ package org.yechan
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.http.HttpMethod
+import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer
 
 class ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizerTest {
 
@@ -12,10 +14,10 @@ class ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizerTest {
 
         ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizer(
             StaticApplicationOpenEndpointPolicy(
-                additionalMatchers =
+                false,
                 listOf(
                     OpenEndpointMatcher(HttpMethod.POST, "/login"),
-                    OpenEndpointMatcher(pattern = "/internal/open"),
+                    OpenEndpointMatcher(null, "/internal/open"),
                 ),
             ),
         ).customize(registry)
@@ -32,3 +34,6 @@ class ApplicationOpenEndpointsAuthorizeHttpRequestsCustomizerTest {
         ) as ApplicationRequestMatcherRegistry
     }
 }
+
+private typealias ApplicationRequestMatcherRegistry =
+    AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
