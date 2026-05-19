@@ -1,7 +1,6 @@
 package org.yechan;
 
 import java.time.Clock;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.BeanRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
